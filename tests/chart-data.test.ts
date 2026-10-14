@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { nearestSample, valueScale } from '../src/web/chart-data';
+import { nearestSample, valueScale, hashRateScale } from '../src/web/chart-data';
 
 describe('chart scales', () => {
   it.each([[1400, 1500], [27.6, 27.8], [54.2, 55], [0, 0], [55, 55], [-10, -10], [0.00001, 0.00002]])('bounds readings and produces a finite labeled scale for %j', (...values) => {
@@ -26,5 +26,14 @@ describe('sample inspection', () => {
     expect(nearestSample(times, 5000)).toBe(1);
     expect(nearestSample(times, 8500)).toBe(2);
     expect(nearestSample([123], 0)).toBe(0);
+  });
+});
+
+
+describe('hashrate display units', () => {
+  it('uses TH/s above 1000 GH/s and retains one unit across the entire chart', () => {
+    expect(hashRateScale([900, 1712])).toEqual({ unit: 'TH/s', divisor: 1000 });
+    expect(hashRateScale([1000, 750])).toEqual({ unit: 'GH/s', divisor: 1 });
+    expect(hashRateScale([])).toEqual({ unit: 'GH/s', divisor: 1 });
   });
 });

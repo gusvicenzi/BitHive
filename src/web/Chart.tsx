@@ -1,7 +1,7 @@
 import { useId, useState, type KeyboardEvent, type PointerEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { MetricView } from '../shared/domain';
-import { nearestSample, valueScale } from './chart-data';
+import { nearestSample, valueScale, hashRateScale } from './chart-data';
 
 export function Chart({ metrics, field, unit, label }: { metrics: MetricView[]; field: 'hashRate' | 'temp' | 'power'; unit: string; label: string }) {
   const { t, i18n } = useTranslation();
@@ -12,6 +12,8 @@ export function Chart({ metrics, field, unit, label }: { metrics: MetricView[]; 
   if (usable.length < 2) return <div className="chart-empty">{t('chartWaiting')}</div>;
   const values = usable.map(m => m[field]!);
   const { min, max, step, ticks } = valueScale(values);
+  const display = field === 'hashRate' ? hashRateScale(values) : { unit, divisor: 1 };
+  const scaleUnit = display.unit;
   const times = usable.map(m => Date.parse(m.timestamp));
   const start = times[0];
   const end = times.at(-1)!;
@@ -31,8 +33,9 @@ export function Chart({ metrics, field, unit, label }: { metrics: MetricView[]; 
   const activeIndex = activeTime === null ? -1 : times.indexOf(activeTime);
   const active = usable[activeIndex];
   const number = (n: number, exact = false) => new Intl.NumberFormat(i18n.language, {
-    maximumFractionDigits: exact ? 6 : Math.min(12, Math.max(1, -Math.floor(Math.log10(step)) + 1)),
-  }).format(n);
+    minimumFractionDigits: exact && display.divisor === 1000 ? 3 : 0,
+    maximumFractionDigits: exact ? (display.divisor === 1000 ? 3 : 6) : Math.min(12, Math.max(1, -Math.floor(Math.log10(step / display.divisor)) + 1)),
+  }).format(n / display.divisor);
   const time = (timestamp: string, seconds = false) => new Date(timestamp).toLocaleString(i18n.language, {
     month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', ...(seconds ? { second: '2-digit' } : {}),
   });
@@ -51,19 +54,19 @@ export function Chart({ metrics, field, unit, label }: { metrics: MetricView[]; 
     if (index !== null) { event.preventDefault(); setActiveTime(times[index]); }
   }
   return <figure className={`chart chart-${field}`}>
-    <figcaption><span>{label}</span><strong>{number(values.at(-1)!)} <small>{unit}</small></strong></figcaption>
+    <figcaption><span>{label}</span><strong>{number(values.at(-1)!, display.divisor === 1000)} <small>{scaleUnit}</small></strong></figcaption>
     <div className="chart-plot">
-      <div className="chart-axis" aria-label={t('chartValueScale', { label, unit })}>
-        {ticks.map(value => <span className="chart-tick" key={value} style={{ top: `${y(value) / 160 * 100}%` }}>{number(value)} <small>{unit}</small></span>)}
+      <div className="chart-axis" aria-label={t('chartValueScale', { label, unit: scaleUnit })}>
+        {ticks.map(value => <span className="chart-tick" key={value} style={{ top: `${y(value) / 160 * 100}%` }}>{number(value)} <small>{scaleUnit}</small></span>)}
       </div>
       <div className="chart-interaction" tabIndex={0} role="slider" aria-label={t('inspectChart', { label })}
         aria-orientation="horizontal" aria-valuemin={0} aria-valuemax={usable.length - 1} aria-valuenow={activeIndex < 0 ? usable.length - 1 : activeIndex}
-        aria-valuetext={active ? `${number(active[field]!, true)} ${unit}, ${time(active.timestamp, true)}` : t('chartKeyboardHint')}
+        aria-valuetext={active ? `${number(active[field]!, true)} ${scaleUnit}, ${time(active.timestamp, true)}` : t('chartKeyboardHint')}
         aria-describedby={active ? tooltipId : undefined}
         onPointerMove={point} onPointerDown={event => { event.currentTarget.focus(); point(event); }}
         onPointerLeave={event => { if (event.pointerType !== 'touch') setActiveTime(null); }}
         onFocus={() => setActiveTime(times.at(-1)!)} onBlur={() => setActiveTime(null)} onKeyDown={key}>
-        <svg viewBox="0 0 800 160" preserveAspectRatio="none" role="img" aria-label={t('chartDescription', { label, min: number(Math.min(...values)), max: number(Math.max(...values)), unit })}>
+        <svg viewBox="0 0 800 160" preserveAspectRatio="none" role="img" aria-label={t('chartDescription', { label, min: number(Math.min(...values)), max: number(Math.max(...values)), unit: scaleUnit })}>
           {ticks.map(value => <line key={value} x1="0" y1={y(value)} x2="800" y2={y(value)} className="grid-line" />)}
           {segments.filter(segment => segment.length).map((segment, index) => <polyline key={index} fill="none" stroke="currentColor" strokeWidth="1.5" vectorEffect="non-scaling-stroke" points={segment.map(m => `${x(m)},${y(m[field]!)}`).join(' ')} />)}
           {active && <line className="chart-cursor" x1={x(active)} x2={x(active)} y1="10" y2="150" vectorEffect="non-scaling-stroke" />}
@@ -71,7 +74,7 @@ export function Chart({ metrics, field, unit, label }: { metrics: MetricView[]; 
         {active && <>
           <span className="chart-point" aria-hidden="true" style={{ left: `${fraction(activeTime!) * 100}%`, top: `${y(active[field]!) / 160 * 100}%` }} />
           <div id={tooltipId} role="tooltip" className="chart-tooltip" style={{ left: `clamp(0px, ${fraction(activeTime!) * 100}%, max(0px, calc(100% - 180px)))` }}>
-            <span>{label}</span><strong>{number(active[field]!, true)} <small>{unit}</small></strong><time dateTime={active.timestamp}>{time(active.timestamp, true)}</time>
+            <span>{label}</span><strong>{number(active[field]!, true)} <small>{scaleUnit}</small></strong><time dateTime={active.timestamp}>{time(active.timestamp, true)}</time>
           </div>
         </>}
       </div>

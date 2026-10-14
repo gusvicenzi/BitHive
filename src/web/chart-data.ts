@@ -1,3 +1,7 @@
+export function hashRateScale(values: number[]) {
+  return values.some(value => Number.isFinite(value) && value > 1000) ? { unit: 'TH/s', divisor: 1000 } : { unit: 'GH/s', divisor: 1 };
+}
+
 export function valueScale(values: number[]) {
   const finite = values.filter(Number.isFinite);
   if (!finite.length) return { min: 0, max: 1, step: 0.25, ticks: [0, 0.25, 0.5, 0.75, 1] };

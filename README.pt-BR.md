@@ -9,7 +9,7 @@ O BitHive atende quem minera em casa com um ou mais aparelhos Bitaxe/ESP-Miner n
 ## Implementado na versão 0.1
 
 - Cadastro por IPv4 privado ou nome de rede, usando automaticamente o nome do AxeOS, com leitura de modelo, placa, firmware e MAC quando disponíveis. Nome de exibição opcional no BitHive.
-- Comparação de hashrate, potência, eficiência em J/TH, temperatura do chip, estado e última atualização bem-sucedida.
+- Comparação de hashrate, potência, eficiência em J/TH, temperatura do chip, percentual de erros de hash, estado e última atualização bem-sucedida.
 - Totais reais excluem dados desatualizados e mineradores simulados. A eficiência usa potência e hashrate combinados somente dos aparelhos com ambos os dados.
 - Histórico local de hashrate, potência e temperatura, com escalas de unidades e dicas com valor/data ao passar o mouse, tocar ou usar o teclado; shares aceitas/rejeitadas, erros, temperatura do regulador, atividade, rotação e melhor dificuldade quando informados.
 - Coleta independente de abas do navegador, enquanto o servidor Node estiver ativo.
@@ -64,6 +64,14 @@ Nos detalhes, use **Nomes do minerador**. **Nome de exibição no BitHive** alte
 A mudança do hostname altera o nome de rede. Para aparelhos cadastrados por nome de rede, o BitHive resolve e valida o IPv4 privado antes do comando e mantém esse IP para verificação e coleta futura. A alteração é recusada se outro cadastro já usa o IP. Hostnames só podem ser alterados individualmente, sem combinar outras configurações ou selecionar vários mineradores. O controle fica indisponível quando o firmware não informa suporte. Resultados incertos são relatados e não são repetidos automaticamente.
 
 Um nome de exibição igual ao hostname anterior acompanha alterações futuras do hostname. Nomes personalizados e nomes de cadastros existentes são preservados. Mineradores simulados aceitam alterações e as mantêm após reiniciar. Comandos de renomeação ainda não foram testados no Starminer físico; a validação física acima cobre somente leituras.
+
+### Unidades dos gráficos e estimativa da fonte
+
+Os gráficos de hashrate usam TH/s quando alguma leitura no histórico exibido supera 1.000 GH/s. Título, régua do eixo Y, dica e informações acessíveis usam a mesma unidade em todo o gráfico. Valores em TH/s mostram três casas decimais, como `1,712 TH/s`. Históricos com leituras de até 1.000 mantêm GH/s. Os dados continuam armazenados em GH/s.
+
+O cartão **Consumo de energia** normalmente mostra a potência informada pelos mineradores conectados. Ative **Incluir perdas da fonte** para ver potência informada + perda estimada da fonte = consumo estimado da tomada, com cores distintas para perda e total. A **Eficiência da fonte (%)** começa em **85%**, uma hipótese ajustável, não uma medição. O consumo estimado é a potência informada dividida pela eficiência / 100; a perda é a diferença. Com 85%, 56,7 W resulta aproximadamente em `56,7 + 10,0 = 66,7 W`. A eficiência deve ser maior que 0% e de no máximo 100%. Os valores exibidos são arredondados de forma consistente para que a soma confira.
+
+A estimativa usa uma única eficiência para a frota. Leituras ausentes ou desatualizadas são excluídas ou indicadas como parciais; simulações continuam fora dos totais reais. A opção não altera potência registrada, configuração, eficiência dos aparelhos nem gráficos históricos. A opção e a eficiência ficam salvas neste navegador; sem armazenamento disponível, funcionam na sessão atual.
 
 ## Compatibilidade e interpretação dos resultados
 

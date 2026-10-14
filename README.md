@@ -9,7 +9,7 @@ BitHive is intended for home miners running one or more Bitaxe/ESP-Miner devices
 ## Implemented in v0.1
 
 - Register a miner by private IPv4 address or local hostname; automatically use its AxeOS name, and read its model, board, firmware, and MAC when available. Optionally assign a BitHive display name.
-- Compare individual hashrate, power, efficiency, chip temperature, status, and last successful update. Real fleet totals exclude stale readings and simulated devices. Efficiency uses paired power/hashrate readings rather than averaging device efficiencies.
+- Compare individual hashrate, power, efficiency, chip temperature, hash-error percentage, status, and last successful update. Real fleet totals exclude stale readings and simulated devices. Efficiency uses paired power/hashrate readings rather than averaging device efficiencies.
 - Inspect local historical charts with labeled unit scales and reading/timestamp tooltips (hover, touch, or keyboard) for hashrate, power, and chip temperature, plus shares, errors, regulator temperature, uptime, fan speed, and best difficulty when reported.
 - Collect metrics independently of browser sessions. A running Node server is required.
 - Configure primary pool, account/payout/worker, and password using legacy or active-slot APIs. Payout formats are determined by the pool.
@@ -63,6 +63,14 @@ Open a miner's details and use **Miner names**. **BitHive display name** updates
 Changing the AxeOS hostname changes its network name. When a miner was registered by hostname, BitHive resolves and validates its private IPv4 address before the command and retains that IP for verification and subsequent collection. It refuses the change if that IP belongs to another registered miner. Hostname changes are individual actions and cannot be combined with other settings or applied to multiple miners at once. Unsupported firmware disables the hostname control. Unknown outcomes are reported and never automatically retried.
 
 A display label matching the previous AxeOS hostname follows later hostname changes. Custom labels stay as entered; existing registered names are preserved. Demo miners support hostname edits and retain them across restarts. Physical Starminer rename commands have not been tested; the physical-device validation above covers reads only.
+
+### Chart units and power supply estimates
+
+Hashrate charts automatically use TH/s when any reading in the displayed history exceeds 1,000 GH/s. The chart title, Y-axis ruler, tooltip, and accessible readings use the same unit throughout the history; TH/s readings display three decimal places (for example, `1.712 TH/s`). Histories at or below the threshold retain GH/s. Stored data stays in GH/s.
+
+The **Power draw** card normally shows online miners' reported power. Enable **Include power supply losses** to show reported watts + estimated supply loss = estimated wall draw, with distinct colors for the loss and total. **Power supply efficiency (%)** defaults to **85%**, an editable assumption rather than a measurement. Estimated wall draw = reported miner power / (efficiency / 100); loss is the difference. At 85%, 56.7 W becomes approximately `56.7 + 10.0 = 66.7 W`. Efficiency must be greater than 0% and at most 100%. The displayed components are rounded consistently to add up.
+
+The estimate uses one fleet-wide efficiency assumption. Missing or stale readings are excluded or marked partial, and demo miners remain outside real totals. This option does not change recorded power, miner configuration, device efficiency, or historical charts. The toggle and efficiency are saved in this browser; if browser storage is unavailable, they work for the current session.
 
 ## Compatibility and command semantics
 

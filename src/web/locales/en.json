@@ -167,5 +167,17 @@
   "hostnameUnavailable": "This firmware does not report a configurable hostname. You can still change the BitHive display name.",
   "chartValueScale": "{{label}} scale ({{unit}})",
   "inspectChart": "Inspect {{label}} history",
-  "chartKeyboardHint": "Use the arrow keys to inspect readings, Home or End for the first or last reading, and Escape to hide the tooltip."
+  "chartKeyboardHint": "Use the arrow keys to inspect readings, Home or End for the first or last reading, and Escape to hide the tooltip.",
+  "hashErrorPercent": "Hash error (%)",
+  "includeSupplyLoss": "Include power supply losses",
+  "psuEfficiency": "Power supply efficiency (%)",
+  "powerEquation": "Miner power {{reported}} W + estimated supply loss {{loss}} W = estimated wall draw {{total}} W",
+  "minerPower": "Miner-reported power",
+  "supplyLoss": "Estimated power supply loss",
+  "wallPower": "Estimated wall draw",
+  "powerEstimateSubtitle": "Miners + supply loss = wall estimate · {{efficiency}}% efficiency",
+  "powerReportedSubtitle": "Online miners only · excludes power supply losses",
+  "psuAssumption": "Default: 85%. Adjust for your supply.",
+  "invalidEfficiency": "Enter an efficiency greater than 0% and at most 100%.",
+  "partialPower": "Some online miners have no power reading; totals and estimates are partial."
 }

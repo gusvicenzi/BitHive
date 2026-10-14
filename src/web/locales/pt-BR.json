@@ -167,5 +167,17 @@
   "hostnameUnavailable": "Este firmware não informa um hostname configurável. Você ainda pode alterar o nome no BitHive.",
   "chartValueScale": "Escala de {{label}} ({{unit}})",
   "inspectChart": "Explorar histórico de {{label}}",
-  "chartKeyboardHint": "Use as setas para explorar as leituras, Home ou End para a primeira ou última leitura e Escape para ocultar a dica."
+  "chartKeyboardHint": "Use as setas para explorar as leituras, Home ou End para a primeira ou última leitura e Escape para ocultar a dica.",
+  "hashErrorPercent": "Erro de hash (%)",
+  "includeSupplyLoss": "Incluir perdas da fonte",
+  "psuEfficiency": "Eficiência da fonte (%)",
+  "powerEquation": "Potência dos mineradores {{reported}} W + perda estimada da fonte {{loss}} W = consumo estimado da tomada {{total}} W",
+  "minerPower": "Potência informada pelos mineradores",
+  "supplyLoss": "Perda estimada da fonte",
+  "wallPower": "Consumo estimado da tomada",
+  "powerEstimateSubtitle": "Mineradores + perda da fonte = estimativa da tomada · eficiência de {{efficiency}}%",
+  "powerReportedSubtitle": "Somente mineradores conectados · sem perdas da fonte",
+  "psuAssumption": "Padrão: 85%. Ajuste para sua fonte.",
+  "invalidEfficiency": "Informe uma eficiência maior que 0% e de no máximo 100%.",
+  "partialPower": "Alguns mineradores conectados não informam potência; totais e estimativas são parciais."
 }

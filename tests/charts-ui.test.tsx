@@ -19,18 +19,28 @@ function bounds(element: HTMLElement) {
   vi.spyOn(element, 'getBoundingClientRect').mockReturnValue({ left: 100, right: 500, top: 0, bottom: 160, width: 400, height: 160, x: 100, y: 0, toJSON: () => ({}) });
 }
 describe('interactive history charts', () => {
-  it.each([['hashRate', 'GH/s', 'Hashrate'], ['power', 'W', 'Power'], ['temp', '°C', 'Temperature']] as const)('shows a labeled %s scale and matching grid lines', (field, unit, label) => {
+  it.each([['hashRate', 'TH/s', 'Hashrate'], ['power', 'W', 'Power'], ['temp', '°C', 'Temperature']] as const)('shows a labeled %s scale and matching grid lines', (field, unit, label) => {
     const { container } = render(<Chart metrics={metrics} field={field} unit={unit} label={label} />);
     const axis = screen.getByLabelText(`${label} scale (${unit})`);
     expect(within(axis).getAllByText(unit).length).toBeGreaterThanOrEqual(2);
     expect(container.querySelectorAll('.chart-tick')).toHaveLength(container.querySelectorAll('.grid-line').length);
+  });
+  it('formats high hashrate as 1.712 TH/s and keeps GH/s at the threshold', () => {
+    const { rerender } = render(<Chart metrics={[sample(0, 1700), sample(15, 1712)]} field="hashRate" unit="GH/s" label="Hashrate" />);
+    expect(screen.getByRole('figure').querySelector('figcaption')).toHaveTextContent('1.712 TH/s');
+    expect(screen.getByLabelText('Hashrate scale (TH/s)')).toBeInTheDocument();
+    fireEvent.focus(screen.getByRole('slider'));
+    expect(screen.getByRole('tooltip')).toHaveTextContent('1.712 TH/s');
+    rerender(<Chart metrics={[sample(0, 750), sample(15, 1000)]} field="hashRate" unit="GH/s" label="Hashrate" />);
+    expect(screen.getByLabelText('Hashrate scale (GH/s)')).toBeInTheDocument();
+    expect(screen.getByRole('figure').querySelector('figcaption')).toHaveTextContent('1,000 GH/s');
   });
   it('shows the nearest real reading, unit, and timestamp on hover, then hides on leave', () => {
     render(<Chart metrics={metrics} field="hashRate" unit="GH/s" label="Hashrate" />);
     const plot = screen.getByRole('slider'); bounds(plot);
     fireEvent.pointerMove(plot, { clientX: 200 });
     const tooltip = screen.getByRole('tooltip');
-    expect(tooltip).toHaveTextContent('1,500.1234 GH/s');
+    expect(tooltip).toHaveTextContent('1.500 TH/s');
     expect(tooltip.querySelector('time')).toHaveAttribute('dateTime', metrics[1].timestamp);
     fireEvent.pointerLeave(plot);
     expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
@@ -39,7 +49,7 @@ describe('interactive history charts', () => {
     render(<Chart metrics={metrics} field="hashRate" unit="GH/s" label="Hashrate" />);
     const plot = screen.getByRole('slider');
     await userEvent.tab(); expect(plot).toHaveFocus(); expect(plot).toHaveAttribute('aria-valuenow', '2');
-    await userEvent.keyboard('{ArrowLeft}'); expect(screen.getByRole('tooltip')).toHaveTextContent('1,500.1234');
+    await userEvent.keyboard('{ArrowLeft}'); expect(screen.getByRole('tooltip')).toHaveTextContent('1.500');
     await userEvent.keyboard('{Home}{ArrowLeft}'); expect(plot).toHaveAttribute('aria-valuenow', '0');
     await userEvent.keyboard('{End}{ArrowRight}'); expect(plot).toHaveAttribute('aria-valuenow', '2');
     await userEvent.keyboard('{Escape}'); expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
@@ -64,8 +74,8 @@ describe('interactive history charts', () => {
     await i18n.changeLanguage('pt-BR');
     render(<Chart metrics={metrics} field="hashRate" unit="GH/s" label="Hashrate" />);
     const plot = screen.getByRole('slider'); bounds(plot); fireEvent.pointerMove(plot, { clientX: 200 });
-    expect(screen.getByRole('tooltip')).toHaveTextContent('1.500,1234 GH/s');
-    expect(screen.getByLabelText('Escala de Hashrate (GH/s)')).toBeInTheDocument();
+    expect(screen.getByRole('tooltip')).toHaveTextContent('1,500 TH/s');
+    expect(screen.getByLabelText('Escala de Hashrate (TH/s)')).toBeInTheDocument();
   });
   it('handles duplicate timestamps, invalid values, and a refresh removing the active reading', () => {
     const { container, rerender } = render(<Chart metrics={[sample(0, 1000), sample(0, 1200), sample(1, NaN)]} field="hashRate" unit="GH/s" label="Hashrate" />);
