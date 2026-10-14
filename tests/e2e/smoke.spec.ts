@@ -1,0 +1,24 @@
+import { expect, test } from '@playwright/test';
+
+test('first run, demonstration fleet, configuration readback and language', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.getByText('Your hive starts with one miner.')).toBeVisible();
+  await page.getByRole('button', { name: 'Try demo' }).first().click();
+  await expect(page.getByText('Demonstration', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Bitaxe 1', exact: true }).click();
+  await expect(page.getByText('Starminer 601').first()).toBeVisible();
+  await page.getByLabel('Frequency (MHz)').selectOption('550');
+  await page.getByRole('button', { name: 'Apply & verify' }).click();
+  await expect(page.getByText('Verified', { exact: true }).first()).toBeVisible();
+  await expect(page.getByLabel('Frequency (MHz)').locator('option').first()).toContainText('550');
+  await page.screenshot({ path: 'test-results/bithive-detail.png', fullPage: true });
+  await page.getByLabel('Language').selectOption('pt-BR');
+  await expect(page.getByRole('heading', { name: 'Sua colmeia, à vista.' })).toBeVisible();
+  await page.reload();
+  await expect(page.getByRole('heading', { name: 'Sua colmeia, à vista.' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Bitaxe 1', exact: true })).toBeVisible();
+  await page.screenshot({ path: 'test-results/bithive-desktop.png', fullPage: true });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.screenshot({ path: 'test-results/bithive-mobile.png', fullPage: true });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});

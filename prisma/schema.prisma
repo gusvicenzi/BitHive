@@ -1,0 +1,68 @@
+generator client {
+  provider = "prisma-client-js"
+}
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+model Device {
+  id          String   @id @default(cuid())
+  address     String   @unique
+  name        String
+  demo        Boolean  @default(false)
+  snapshot    String   @default("{}")
+  lastSeen    DateTime?
+  failures    Int      @default(0)
+  nextPoll    DateTime @default(now())
+  createdAt   DateTime @default(now())
+  metrics     Metric[]
+  events      Event[]
+  changes     ConfigChange[]
+  profiles    Profile[]
+  @@index([nextPoll])
+}
+model Profile {
+  id          String   @id @default(cuid())
+  deviceId    String
+  device      Device   @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  name        String
+  settings    String
+  createdAt   DateTime @default(now())
+  @@index([deviceId, createdAt])
+}
+model Metric {
+  id          Int      @id @default(autoincrement())
+  deviceId    String
+  device      Device   @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  timestamp   DateTime @default(now())
+  hashRate    Float?
+  power       Float?
+  temp        Float?
+  vrTemp      Float?
+  errorRate   Float?
+  accepted    Float?
+  rejected    Float?
+  @@index([deviceId, timestamp])
+  @@index([timestamp])
+}
+model Event {
+  id          Int      @id @default(autoincrement())
+  deviceId    String
+  device      Device   @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  timestamp   DateTime @default(now())
+  kind        String
+  @@index([deviceId, timestamp])
+  @@index([timestamp])
+}
+model ConfigChange {
+  id          Int      @id @default(autoincrement())
+  deviceId    String
+  device      Device   @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  timestamp   DateTime @default(now())
+  before      String
+  requested   String
+  after       String?
+  result      String
+  @@index([deviceId, timestamp])
+  @@index([timestamp])
+}
