@@ -164,5 +164,8 @@
   "hostname": "AxeOS name (hostname)",
   "hostnameHint": "Changes the name on the miner and its .local address. Use letters, numbers, and hyphens (up to 63 characters). BitHive keeps the connection by IP and verifies the change. Uncertain results must be checked in AxeOS before trying again.",
   "saveHostname": "Change AxeOS name & verify",
-  "hostnameUnavailable": "This firmware does not report a configurable hostname. You can still change the BitHive display name."
+  "hostnameUnavailable": "This firmware does not report a configurable hostname. You can still change the BitHive display name.",
+  "chartValueScale": "{{label}} scale ({{unit}})",
+  "inspectChart": "Inspect {{label}} history",
+  "chartKeyboardHint": "Use the arrow keys to inspect readings, Home or End for the first or last reading, and Escape to hide the tooltip."
 }

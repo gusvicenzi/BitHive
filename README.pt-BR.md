@@ -11,7 +11,7 @@ O BitHive atende quem minera em casa com um ou mais aparelhos Bitaxe/ESP-Miner n
 - Cadastro por IPv4 privado ou nome de rede, usando automaticamente o nome do AxeOS, com leitura de modelo, placa, firmware e MAC quando disponíveis. Nome de exibição opcional no BitHive.
 - Comparação de hashrate, potência, eficiência em J/TH, temperatura do chip, estado e última atualização bem-sucedida.
 - Totais reais excluem dados desatualizados e mineradores simulados. A eficiência usa potência e hashrate combinados somente dos aparelhos com ambos os dados.
-- Histórico local de hashrate, potência e temperatura; shares aceitas/rejeitadas, erros, temperatura do regulador, atividade, rotação e melhor dificuldade quando informados.
+- Histórico local de hashrate, potência e temperatura, com escalas de unidades e dicas com valor/data ao passar o mouse, tocar ou usar o teclado; shares aceitas/rejeitadas, erros, temperatura do regulador, atividade, rotação e melhor dificuldade quando informados.
 - Coleta independente de abas do navegador, enquanto o servidor Node estiver ativo.
 - Configuração da pool principal, conta/endereço de pagamento e worker, além de senha. Suporte aos campos antigos e ao slot principal ativo de firmware com múltiplas pools.
 - Seleção de frequência e tensão entre as opções fornecidas pelo aparelho; refrigeração automática ou manual quando suportada.

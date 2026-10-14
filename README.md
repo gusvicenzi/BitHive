@@ -10,7 +10,7 @@ BitHive is intended for home miners running one or more Bitaxe/ESP-Miner devices
 
 - Register a miner by private IPv4 address or local hostname; automatically use its AxeOS name, and read its model, board, firmware, and MAC when available. Optionally assign a BitHive display name.
 - Compare individual hashrate, power, efficiency, chip temperature, status, and last successful update. Real fleet totals exclude stale readings and simulated devices. Efficiency uses paired power/hashrate readings rather than averaging device efficiencies.
-- Inspect local historical charts for hashrate, power, and chip temperature, plus shares, errors, regulator temperature, uptime, fan speed, and best difficulty when reported.
+- Inspect local historical charts with labeled unit scales and reading/timestamp tooltips (hover, touch, or keyboard) for hashrate, power, and chip temperature, plus shares, errors, regulator temperature, uptime, fan speed, and best difficulty when reported.
 - Collect metrics independently of browser sessions. A running Node server is required.
 - Configure primary pool, account/payout/worker, and password using legacy or active-slot APIs. Payout formats are determined by the pool.
 - Select device-reported frequency/voltage options and supported automatic/manual fan controls. Save and load named operating profiles per miner.

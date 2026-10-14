@@ -11,6 +11,25 @@ test('first run, demonstration fleet, configuration readback and language', asyn
   await page.getByRole('button', { name: 'Apply & verify' }).click();
   await expect(page.getByText('Verified', { exact: true }).first()).toBeVisible();
   await expect(page.getByLabel('Frequency (MHz)').locator('option').first()).toContainText('550');
+  for (const [label, unit] of [['Hashrate', 'GH/s'], ['Power', 'W'], ['Chip temperature', '°C']]) {
+    const chart = page.getByRole('slider', { name: `Inspect ${label} history` });
+    await expect(page.getByLabel(`${label} scale (${unit})`)).toBeVisible();
+    await chart.hover({ position: { x: 5, y: 80 } });
+    await expect(chart.getByRole('tooltip')).toContainText(unit);
+    await expect(chart.getByRole('tooltip').locator('time')).toHaveAttribute('datetime', /.+/);
+    await chart.focus();
+    await page.keyboard.press('Home');
+    await expect(chart).toHaveAttribute('aria-valuenow', '0');
+    await page.keyboard.press('End');
+    const plotBox = (await chart.boundingBox())!;
+    const tooltipBox = (await chart.getByRole('tooltip').boundingBox())!;
+    expect(tooltipBox.x).toBeGreaterThanOrEqual(plotBox.x - 1);
+    expect(tooltipBox.x + tooltipBox.width).toBeLessThanOrEqual(plotBox.x + plotBox.width + 1);
+    await page.keyboard.press('Escape');
+    await expect(chart.getByRole('tooltip')).toHaveCount(0);
+  }
+  await page.getByRole('slider', { name: 'Inspect Hashrate history' }).hover({ position: { x: 20, y: 80 } });
+  await page.locator('.charts').screenshot({ path: 'test-results/bithive-chart-tooltip.png' });
   await page.getByLabel('AxeOS name (hostname)').fill('demo-office');
   await page.getByRole('button', { name: 'Change AxeOS name & verify' }).click();
   await expect(page.getByLabel('AxeOS name (hostname)')).toHaveValue('demo-office');

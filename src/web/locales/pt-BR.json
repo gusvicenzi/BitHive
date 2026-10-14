@@ -164,5 +164,8 @@
   "hostname": "Nome no AxeOS (hostname)",
   "hostnameHint": "Altera o nome no minerador e seu endereço .local. Use letras, números e hífens (até 63 caracteres). O BitHive mantém a conexão pelo IP e verifica a alteração. Confira resultados incertos no AxeOS antes de tentar novamente.",
   "saveHostname": "Alterar nome no AxeOS e verificar",
-  "hostnameUnavailable": "Este firmware não informa um hostname configurável. Você ainda pode alterar o nome no BitHive."
+  "hostnameUnavailable": "Este firmware não informa um hostname configurável. Você ainda pode alterar o nome no BitHive.",
+  "chartValueScale": "Escala de {{label}} ({{unit}})",
+  "inspectChart": "Explorar histórico de {{label}}",
+  "chartKeyboardHint": "Use as setas para explorar as leituras, Home ou End para a primeira ou última leitura e Escape para ocultar a dica."
 }
