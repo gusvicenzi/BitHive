@@ -58,7 +58,7 @@ test('first run, demonstration fleet, configuration readback and language', asyn
 test('graph TH/s, fleet hash errors and nonzero power-supply estimates', async ({ page }) => {
   // Synthetic responses exercise the UI without contacting or configuring miners.
   const now = Date.now();
-  const snapshot = { model: 'Gamma', hostname: 'office-gamma', hashRate: 1712, power: 56.7, temp: 54.8, errorRate: 0.93,
+  const snapshot = { model: 'Gamma', hostname: 'office-gamma', hashRate: 1712, power: 56.7, temp: 54.8, errorRate: 0.93, bestDiff: '1564123456789',
     settings: {}, capabilities: { writable: [], frequencies: [], voltages: [], poolMode: 'none' } };
   await page.route('**/api/devices', route => route.fulfill({ json: [{ id: 'example', address: '192.168.1.42', name: 'Office miner', demo: false, status: 'online', lastSeen: new Date(now).toISOString(), snapshot }] }));
   await page.route(/\/api\/devices\/example\/history\?/, route => route.fulfill({ json: {
@@ -72,6 +72,11 @@ test('graph TH/s, fleet hash errors and nonzero power-supply estimates', async (
   await expect(page.getByLabel(/Miner power 56.7 W/)).toContainText('56.7+10.0=66.7 W');
   await page.locator('.summary').screenshot({ path: 'test-results/bithive-power-estimate.png' });
   await page.getByRole('button', { name: 'Office miner', exact: true }).click();
+  const difficulty = page.getByRole('button', { name: 'Show full best difficulty' });
+  await expect(difficulty).toHaveText('1.564T');
+  await difficulty.hover();
+  await expect(page.getByRole('tooltip')).toHaveText('1,564,123,456,789');
+  await page.mouse.move(0, 0);
   await expect(page.locator('.chart-hashRate figcaption')).toContainText('1.712 TH/s');
   await page.getByRole('slider', { name: 'Inspect Hashrate history' }).focus();
   await expect(page.getByRole('tooltip')).toContainText('1.712 TH/s');

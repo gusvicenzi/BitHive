@@ -33,8 +33,8 @@ export function Chart({ metrics, field, unit, label }: { metrics: MetricView[]; 
   const activeIndex = activeTime === null ? -1 : times.indexOf(activeTime);
   const active = usable[activeIndex];
   const number = (n: number, exact = false) => new Intl.NumberFormat(i18n.language, {
-    minimumFractionDigits: exact && display.divisor === 1000 ? 3 : 0,
-    maximumFractionDigits: exact ? (display.divisor === 1000 ? 3 : 6) : Math.min(12, Math.max(1, -Math.floor(Math.log10(step / display.divisor)) + 1)),
+    minimumFractionDigits: exact ? (field === 'hashRate' ? (display.divisor === 1000 ? 3 : 0) : 1) : 0,
+    maximumFractionDigits: exact ? (field === 'hashRate' ? (display.divisor === 1000 ? 3 : 6) : 1) : Math.min(12, Math.max(1, -Math.floor(Math.log10(step / display.divisor)) + 1)),
   }).format(n / display.divisor);
   const time = (timestamp: string, seconds = false) => new Date(timestamp).toLocaleString(i18n.language, {
     month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', ...(seconds ? { second: '2-digit' } : {}),

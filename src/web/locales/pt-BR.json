@@ -179,5 +179,7 @@
   "powerReportedSubtitle": "Somente mineradores conectados · sem perdas da fonte",
   "psuAssumption": "Padrão: 85%. Ajuste para sua fonte.",
   "invalidEfficiency": "Informe uma eficiência maior que 0% e de no máximo 100%.",
-  "partialPower": "Alguns mineradores conectados não informam potência; totais e estimativas são parciais."
+  "partialPower": "Alguns mineradores conectados não informam potência; totais e estimativas são parciais.",
+  "inspectDifficulty": "Mostrar melhor dificuldade completa",
+  "expandedDifficulty": "Expandido a partir do valor abreviado informado pelo firmware."
 }
