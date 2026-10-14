@@ -1,5 +1,5 @@
 import { Prisma, type PrismaClient } from '@prisma/client';
-import { type Settings, type ActionResult, addressSchema, settingsSchema } from '../shared/domain.js';
+import { type Settings, type ActionResult, addressSchema, settingsSchema, displayNameSchema } from '../shared/domain.js';
 import { AxeAdapter, type MinerAdapter, validateCapabilities } from './adapter.js';
 import { DemoAdapter } from './demo.js';
 import { Limiter, DeviceLocks } from './concurrency.js';
@@ -16,20 +16,33 @@ export class FleetService {
     return device;
   }
   async list() { return (await this.db.device.findMany({ orderBy: { createdAt: 'asc' }, take: 500 })).map(view); }
-  async register(address: string, name: string) {
+  async register(address: string, name?: string) {
     address = addressSchema.parse(address);
     return this.limiter.run(async () => {
       if (await this.db.device.count() >= 500) throw new AppError('fleetLimit');
       if (await this.db.device.findUnique({ where: { address } })) throw new AppError('duplicateDevice', 409);
       const reading = await this.hardware.read(address);
+      const displayName = name?.trim() ? displayNameSchema.parse(name) : (reading.snapshot.hostname?.trim() || reading.snapshot.model?.trim() || address).slice(0, 80);
       try {
-        const device = await this.db.device.create({ data: { address, name } });
+        const device = await this.db.device.create({ data: { address, name: displayName } });
         await persistReading(this.db, device, reading.snapshot);
         return view(await this.device(device.id));
       } catch (error) {
         if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') throw new AppError('duplicateDevice', 409);
         throw error;
       }
+    });
+  }
+  async renameDisplayName(id: string, name: string) {
+    name = displayNameSchema.parse(name);
+    return this.locks.run(id, async () => {
+      const device = await this.device(id);
+      const [updated] = await this.db.$transaction([
+        this.db.device.update({ where: { id }, data: { name } }),
+        this.db.configChange.create({ data: { deviceId: id, before: JSON.stringify({ displayName: device.name }), requested: JSON.stringify({ displayName: name }), after: JSON.stringify({ displayName: name }), result: 'verified' } }),
+        this.db.event.create({ data: { deviceId: id, kind: 'renamed' } }),
+      ]);
+      return view(updated);
     });
   }
   async enableDemo() {
@@ -43,7 +56,7 @@ export class FleetService {
   async poll(id: string) {
     return this.locks.run(id, () => this.limiter.run(async () => {
       const device = await this.device(id);
-      const adapter = device.demo ? this.demo : this.hardware;
+      const adapter: MinerAdapter = device.demo ? this.demo : this.hardware;
       if (device.demo) {
         const previous = snapshotOf(device);
         if (previous) this.demo.restore(device.address, previous.settings);
@@ -65,9 +78,19 @@ export class FleetService {
   async configure(id: string, input: Settings): Promise<ActionResult> {
     const settings = settingsSchema.parse(input);
     return this.locks.run(id, () => this.limiter.run(async () => {
-      const device = await this.device(id);
-      const adapter = device.demo ? this.demo : this.hardware;
+      let device = await this.device(id);
+      const adapter: MinerAdapter = device.demo ? this.demo : this.hardware;
       if (device.demo && snapshotOf(device)) this.demo.restore(device.address, snapshotOf(device)!.settings);
+      // Hostname changes can invalidate the old mDNS address. Resolve it once,
+      // then keep the validated IP for dispatch, verification, and future polls.
+      if (settings.hostname !== undefined && adapter.stableAddress) {
+        const address = await adapter.stableAddress(device.address);
+        if (address !== device.address) {
+          const existing = await this.db.device.findUnique({ where: { address } });
+          if (existing && existing.id !== id) throw new AppError('duplicateDevice', 409);
+          device = await this.db.device.update({ where: { id }, data: { address } });
+        }
+      }
       // Read immediately before writing so capability checks and pool slots are current.
       const before = await adapter.read(device.address);
       validateCapabilities(settings, before.snapshot);

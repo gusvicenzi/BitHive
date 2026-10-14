@@ -8,7 +8,7 @@ BitHive is intended for home miners running one or more Bitaxe/ESP-Miner devices
 
 ## Implemented in v0.1
 
-- Register a miner by private IPv4 address or local hostname; read its model, board, firmware, and MAC when available.
+- Register a miner by private IPv4 address or local hostname; automatically use its AxeOS name, and read its model, board, firmware, and MAC when available. Optionally assign a BitHive display name.
 - Compare individual hashrate, power, efficiency, chip temperature, status, and last successful update. Real fleet totals exclude stale readings and simulated devices. Efficiency uses paired power/hashrate readings rather than averaging device efficiencies.
 - Inspect local historical charts for hashrate, power, and chip temperature, plus shares, errors, regulator temperature, uptime, fan speed, and best difficulty when reported.
 - Collect metrics independently of browser sessions. A running Node server is required.
@@ -50,11 +50,19 @@ The compiler and Prisma CLI are intentionally installed locally because normal s
 ### First run
 
 1. Choose **Try demo** to explore without hardware. The three simulated miners are clearly labeled and excluded from real fleet totals; clicking again refreshes them without adding duplicates.
-2. Choose **Add miner**, give it a recognizable name, and enter its private address, such as `192.168.1.42`, or hostname, such as `bitaxe.local`. Enter a host only, without a URL, path, or port. Identity is read before registration completes.
+2. Choose **Add miner**, enter its private address, such as `192.168.1.42`, or hostname, such as `bitaxe.local`. Enter a host only, without a URL, path, or port. Identity and the AxeOS name are read before registration completes. Leave the optional display name empty to use the AxeOS name (falling back to model or address when absent).
 3. Select the miner's name to open history, reported statistics, operating controls, primary pool settings, and recent audit activity. Historical collection starts at registration; prior firmware history is not imported.
 4. Leave fields empty to preserve current values. **Apply & verify** sends a single change and reads state again. A password is never displayed or stored by BitHive and cannot be verified through readback.
 5. Select multiple rows to refresh or configure the group. Options shown originate from the opened miner; each target is checked separately and incompatible targets fail individually.
 6. Save selected operating fields under a profile name to reuse them on that miner. Loading a profile only fills the form; applying it is a separate action. Profiles are not certified stable settings.
+
+### Changing miner names
+
+Open a miner's details and use **Miner names**. **BitHive display name** updates only the local label, including while the miner is offline, and records the edit in local history. **AxeOS name (hostname)** changes the actual miner setting through a single `PATCH /api/system` and verifies it by reading the miner again. Use 1–63 letters, numbers, or hyphens, starting and ending with a letter or number; input is normalized to lowercase. Do not include `.local`.
+
+Changing the AxeOS hostname changes its network name. When a miner was registered by hostname, BitHive resolves and validates its private IPv4 address before the command and retains that IP for verification and subsequent collection. It refuses the change if that IP belongs to another registered miner. Hostname changes are individual actions and cannot be combined with other settings or applied to multiple miners at once. Unsupported firmware disables the hostname control. Unknown outcomes are reported and never automatically retried.
+
+A display label matching the previous AxeOS hostname follows later hostname changes. Custom labels stay as entered; existing registered names are preserved. Demo miners support hostname edits and retain them across restarts. Physical Starminer rename commands have not been tested; the physical-device validation above covers reads only.
 
 ## Compatibility and command semantics
 

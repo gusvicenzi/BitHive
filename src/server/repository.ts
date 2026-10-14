@@ -14,7 +14,9 @@ export async function persistReading(db: PrismaClient, device: Device, snapshot:
   const before = snapshotOf(device);
   const changed = before && JSON.stringify(before.settings) !== JSON.stringify(snapshot.settings);
   await db.$transaction([
-    db.device.update({ where: { id: device.id }, data: { snapshot: JSON.stringify(snapshot), lastSeen: now, failures: 0, nextPoll: new Date(now.getTime() + 15000) } }),
+    db.device.update({ where: { id: device.id }, data: { snapshot: JSON.stringify(snapshot), lastSeen: now, failures: 0, nextPoll: new Date(now.getTime() + 15000),
+      ...(before?.hostname && device.name === before.hostname && snapshot.hostname?.trim() ? { name: snapshot.hostname.trim().slice(0, 80) } : {}),
+    } }),
     db.metric.create({ data: { deviceId: device.id, timestamp: now, hashRate: snapshot.hashRate, power: snapshot.power, temp: snapshot.temp,
       vrTemp: snapshot.vrTemp, errorRate: snapshot.errorRate, accepted: snapshot.accepted, rejected: snapshot.rejected } }),
     ...(device.failures || !device.lastSeen ? [db.event.create({ data: { deviceId: device.id, kind: 'connected', timestamp: now } })] : []),

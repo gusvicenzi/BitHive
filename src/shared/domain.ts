@@ -1,7 +1,10 @@
 import { z } from 'zod';
 
 export const addressSchema = z.string().trim().toLowerCase().max(253).regex(/^(?=.{1,253}$)[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$/).refine(s => !s.includes('..'));
+export const displayNameSchema = z.string().trim().min(1).max(80);
+export const hostnameSchema = z.string().trim().toLowerCase().min(1).max(63).regex(/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/);
 export const settingsSchema = z.object({
+  hostname: hostnameSchema.optional(),
   frequency: z.number().int().positive().optional(),
   coreVoltage: z.number().int().positive().optional(),
   autofanspeed: z.union([z.literal(0), z.literal(1)]).optional(),
@@ -10,7 +13,8 @@ export const settingsSchema = z.object({
   stratumPort: z.number().int().min(1).max(65535).optional(),
   stratumUser: z.string().trim().min(1).max(255).optional(),
   stratumPassword: z.string().max(255).optional(),
-}).strict().refine(s => Object.keys(s).length > 0);
+}).strict().refine(s => Object.keys(s).length > 0)
+  .refine(s => s.hostname === undefined || Object.keys(s).length === 1);
 export type Settings = z.infer<typeof settingsSchema>;
 
 export interface Snapshot {

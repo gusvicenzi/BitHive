@@ -4,6 +4,7 @@ import { aggregate, efficiency, type ActionResult, type DeviceView, type MetricV
 import { api } from './api';
 import { Chart } from './Chart';
 import { Configuration } from './Configuration';
+import { DeviceNaming } from './DeviceNaming';
 
 type History = { metrics: MetricView[]; events: { id: number; kind: string; timestamp: string }[]; changes: { id: number; result: string; timestamp: string; requested: string; before: string; after: string | null }[]; limit: number };
 export function App() {
@@ -55,7 +56,7 @@ export function App() {
   }
   function add(event: FormEvent) {
     event.preventDefault();
-    void mutation(async () => { await api('/devices', { address, name }); setAdding(false); setAddress(''); setName(''); });
+    void mutation(async () => { await api('/devices', { address, ...(name.trim() ? { name } : {}) }); setAdding(false); setAddress(''); setName(''); });
   }
   const batch = (ids: string[], settings?: Settings) => void mutation(async () => {
     setResults(await api<ActionResult[]>('/batch', { ids, action: settings ? 'configure' : 'refresh', ...(settings ? { settings } : {}) }));
@@ -75,7 +76,7 @@ export function App() {
         <button disabled={busy} onClick={() => void mutation(() => api('/demo', {}))}>{t('tryDemo')}</button><button className="primary" onClick={() => setAdding(!adding)}>{t('addDevice')}</button></div>
     </header>
     {error && <div className="error-banner" role="alert">{t(`errors.${error}`, { defaultValue: t('errors.operationFailed') })}</div>}
-    {adding && <form className="add-form panel" onSubmit={add}><h2>{t('addDevice')}</h2><div className="form-grid"><label>{t('deviceName')}<input required maxLength={80} value={name} onChange={event => setName(event.target.value)} /></label><label>{t('deviceAddress')}<input required maxLength={253} placeholder={t('addressPlaceholder')} value={address} onChange={event => setAddress(event.target.value)} /></label></div><p className="muted">{t('registrationHint')}</p><div className="form-actions"><button disabled={busy} className="primary">{busy ? t('working') : t('connectDevice')}</button><button type="button" onClick={() => setAdding(false)}>{t('cancel')}</button></div></form>}
+    {adding && <form className="add-form panel" onSubmit={add}><h2>{t('addDevice')}</h2><div className="form-grid"><label>{t('optionalDisplayName')}<input placeholder={t('nameFromAxeos')} maxLength={80} value={name} onChange={event => setName(event.target.value)} /></label><label>{t('deviceAddress')}<input required maxLength={253} placeholder={t('addressPlaceholder')} value={address} onChange={event => setAddress(event.target.value)} /></label></div><p className="muted">{t('registrationHint')}</p><div className="form-actions"><button disabled={busy} className="primary">{busy ? t('working') : t('connectDevice')}</button><button type="button" onClick={() => setAdding(false)}>{t('cancel')}</button></div></form>}
     <section className="summary" aria-label={t('fleetSummary')}>
       <article><span>{t('totalHashrate')}</span><strong>{number(totals.hashRate / 1000)} <small>TH/s</small></strong><p>{t('currentReadings')}</p></article>
       <article><span>{t('totalPower')}</span><strong>{number(totals.power)} <small>W</small></strong><p>{t('reportedByDevices')}</p></article>
@@ -97,6 +98,7 @@ export function App() {
       <dl className="device-facts">{([['firmware', detail.snapshot.firmware], ['board', detail.snapshot.board], ['mac', detail.snapshot.mac], ['accepted', number(detail.snapshot.accepted, 0)], ['rejected', number(detail.snapshot.rejected, 0)], ['errorRate', `${number(detail.snapshot.errorRate)} %`], ['fanRpm', number(detail.snapshot.fanRpm, 0)], ['regulatorTemp', `${number(detail.snapshot.vrTemp)} °C`], ['uptime', detail.snapshot.uptime === undefined ? '—' : t('uptimeHours', { value: number(detail.snapshot.uptime / 3600) })], ['bestDiff', detail.snapshot.bestDiff]] as const).map(([key, value]) => <div key={key}><dt>{t(key)}</dt><dd>{value ?? '—'}</dd></div>)}</dl>
       <div className="section-title"><h3>{t('history')}</h3><label>{t('timeRange')}<select value={hours} onChange={event => { setHours(Number(event.target.value)); setHistory(null); }}><option value="1">{t('oneHour')}</option><option value="24">{t('oneDay')}</option><option value="168">{t('oneWeek')}</option></select></label></div>
       {historyError ? <p role="alert">{t(`errors.${historyError}`, { defaultValue: t('errors.operationFailed') })}</p> : !history ? <p role="status">{t('loading')}</p> : <><div className="charts"><Chart metrics={history.metrics} field="hashRate" unit="GH/s" label={t('hashrate')} /><Chart metrics={history.metrics} field="power" unit="W" label={t('power')} /><Chart metrics={history.metrics} field="temp" unit="°C" label={t('temperature')} /></div><p className="muted">{t('historyLimit', { count: history.limit })}</p></>}
+      <DeviceNaming key={`names-${detail.id}`} device={detail} busy={busy} onUpdated={() => reload()} />
       <Configuration key={detail.id} device={detail} count={selected.includes(detail.id) ? selected.length : 1} busy={busy} onApply={settings => batch(selected.includes(detail.id) ? selected : [detail.id], settings)} />
       <div className="audit-grid"><div><h3>{t('deviceEvents')}</h3>{history?.events.length ? history.events.map(event => <p key={event.id}><time>{date(event.timestamp)}</time> {t(`events.${event.kind}`, { defaultValue: t('events.observed') })}</p>) : <p className="muted">{t('noEvents')}</p>}</div><div><h3>{t('configurationHistory')}</h3>{history?.changes.length ? history.changes.map(change => <details key={change.id}><summary>{date(change.timestamp)} · {t(`results.${change.result}`, { defaultValue: t('results.observed') })}</summary><dl>{Object.entries(JSON.parse(change.result === 'observed' ? change.after ?? '{}' : change.requested)).map(([key, value]) => <div key={key}><dt>{t(key)}</dt><dd>{typeof value === 'number' ? number(value) : typeof value === 'boolean' ? t('changed') : String(value)}</dd></div>)}</dl></details>) : <p className="muted">{t('noChanges')}</p>}</div></div>
     </section>}

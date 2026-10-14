@@ -4,7 +4,7 @@ import { z, ZodError } from 'zod';
 import type { PrismaClient } from '@prisma/client';
 import { FleetService } from './service.js';
 import { AppError } from './errors.js';
-import { settingsSchema, addressSchema } from '../shared/domain.js';
+import { settingsSchema, addressSchema, displayNameSchema } from '../shared/domain.js';
 
 export async function createApp(db: PrismaClient, options: { service?: FleetService; webRoot?: string; dev?: boolean } = {}) {
   const app = Fastify({ logger: false, bodyLimit: 16384, requestTimeout: 30000 });
@@ -36,10 +36,15 @@ export async function createApp(db: PrismaClient, options: { service?: FleetServ
   app.get('/api/health', () => ({ status: 'ok' }));
   app.get('/api/devices', () => service.list());
   app.post('/api/devices', async (req, reply) => {
-    const body = z.object({ address: addressSchema, name: z.string().trim().min(1).max(80) }).strict().parse(req.body);
+    const body = z.object({ address: addressSchema, name: z.string().trim().max(80).optional() }).strict().parse(req.body);
     return reply.code(201).send(await service.register(body.address, body.name));
   });
   app.post('/api/demo', () => service.enableDemo());
+  app.post('/api/devices/:id/name', async req => {
+    const { id } = z.object({ id: z.string().min(1).max(64) }).parse(req.params);
+    const { name } = z.object({ name: displayNameSchema }).strict().parse(req.body);
+    return service.renameDisplayName(id, name);
+  });
   app.get('/api/devices/:id/profiles', async req => {
     const { id } = z.object({ id: z.string().min(1).max(64) }).parse(req.params);
     if (!await db.device.findUnique({ where: { id } })) throw new AppError('notFound', 404);
@@ -61,7 +66,8 @@ export async function createApp(db: PrismaClient, options: { service?: FleetServ
   app.post('/api/batch', req => {
     const body = z.object({ ids: z.array(z.string().min(1).max(64)).min(1).max(50).refine(ids => new Set(ids).size === ids.length),
       action: z.enum(['refresh', 'configure']), settings: settingsSchema.optional() }).strict()
-      .refine(v => v.action !== 'configure' || v.settings !== undefined).parse(req.body);
+      .refine(v => v.action !== 'configure' || v.settings !== undefined)
+      .refine(v => v.settings?.hostname === undefined || v.ids.length === 1).parse(req.body);
     return service.batch(body.ids, body.action, body.settings);
   });
   app.get('/api/devices/:id/history', async req => {

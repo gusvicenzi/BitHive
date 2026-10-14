@@ -14,7 +14,7 @@
   "deviceName": "Nome do minerador",
   "deviceAddress": "IP local ou nome de rede",
   "addressPlaceholder": "192.168.1.42 ou bitaxe.local",
-  "registrationHint": "Conecte-se à mesma rede do minerador. O BitHive lê sua identificação antes de adicioná-lo.",
+  "registrationHint": "Conecte-se à mesma rede do minerador. O BitHive lê o nome do AxeOS automaticamente; deixe o nome opcional vazio para usá-lo.",
   "working": "Processando…",
   "connectDevice": "Conectar minerador",
   "cancel": "Cancelar",
@@ -149,8 +149,20 @@
     "verified": "Configuração verificada",
     "unverified": "Configuração não verificada",
     "unknown": "Resultado da configuração incerto",
-    "observed": "Estado do aparelho alterado"
+    "observed": "Estado do aparelho alterado",
+    "renamed": "Nome de exibição no BitHive alterado"
   },
   "changed": "Alterada",
-  "passwordChanged": "Senha da pool"
+  "passwordChanged": "Senha da pool",
+  "optionalDisplayName": "Nome no BitHive (opcional)",
+  "nameFromAxeos": "Usar o nome configurado no AxeOS",
+  "minerNames": "Nomes do minerador",
+  "displayName": "Nome de exibição no BitHive",
+  "displayNameHint": "Altera somente o nome no BitHive. Funciona mesmo com o minerador desconectado.",
+  "saveDisplayName": "Salvar nome de exibição",
+  "displayNameSaved": "Nome de exibição salvo.",
+  "hostname": "Nome no AxeOS (hostname)",
+  "hostnameHint": "Altera o nome no minerador e seu endereço .local. Use letras, números e hífens (até 63 caracteres). O BitHive mantém a conexão pelo IP e verifica a alteração. Confira resultados incertos no AxeOS antes de tentar novamente.",
+  "saveHostname": "Alterar nome no AxeOS e verificar",
+  "hostnameUnavailable": "Este firmware não informa um hostname configurável. Você ainda pode alterar o nome no BitHive."
 }

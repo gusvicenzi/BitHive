@@ -11,16 +11,19 @@ export function privateIPv4(address: string) {
 }
 export async function resolveAddress(host: string) {
   addressSchema.parse(host);
-  const records = isIP(host) ? [{ address: host, family: isIP(host) }] : await lookup(host, { all: true, family: 4 });
-  if (!records.length || records.some(record => !privateIPv4(record.address))) throw new AppError('localAddressRequired');
-  return records[0].address;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const records = isIP(host) ? [{ address: host, family: isIP(host) }] : await Promise.race([
+      lookup(host, { all: true, family: 4 }),
+      new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new AppError('deviceTimeout')), 5000); timer.unref(); }),
+    ]);
+    if (!records.length || records.some(record => !privateIPv4(record.address))) throw new AppError('localAddressRequired');
+    return records[0].address;
+  } finally { clearTimeout(timer); }
 }
 export type Transport = (host: string, path: string, method?: 'GET' | 'PATCH', body?: unknown) => Promise<unknown>;
 export const transport: Transport = async (host, path, method = 'GET', body) => {
-  const address = await Promise.race([
-    resolveAddress(host),
-    new Promise<never>((_, reject) => { const timer = setTimeout(() => reject(new AppError('deviceTimeout')), 5000); timer.unref(); }),
-  ]);
+  const address = await resolveAddress(host);
   return new Promise((resolve, reject) => {
     const data = body === undefined ? undefined : JSON.stringify(body);
     // Connect to the validated address, not the hostname: DNS cannot change the target mid-request.

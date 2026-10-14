@@ -36,3 +36,9 @@ The local database uses atomic sample/device/event writes and indexed retention 
 ## Dependency decisions
 
 Prisma 6.19.3 retains a straightforward SQLite client without an additional native driver installation. `deepmerge-ts` is overridden to patched 8.x to address a recursive-merge advisory in the CLI dependency tree; generation, migration deployment, migration idempotence, and persistence are tested with the override. Review this override on future Prisma upgrades. ESLint 10 and Node.js 24 are used. The npm lockfile records the exact dependency graph.
+
+## Miner naming
+
+Registration uses the reported AxeOS hostname when no local label is supplied, with model/address fallbacks. Local display-name edits are device-serialized, audited, and never contact the miner. Existing names are not migrated. A label identical to the previous reported hostname follows future observed hostname changes; distinct custom labels are preserved. The hostname is also included in normalized settings and detected writable capabilities when reported.
+
+AxeOS hostname updates are standalone single-device commands with lowercase DNS-label validation. The official HTTP implementation applies hostname changes to NVS and mDNS and may return a redirect; BitHive does not follow that redirect. For hostname-based registrations, the adapter resolves a private IPv4 address with the normal bounded DNS validation before dispatch, rejects collisions with another registration, and retains that address for readback and subsequent polls, even if the outcome is uncertain. Acknowledgement and verification follow the existing audited one-shot workflow. No schema migration or automatic rename of existing devices is required.

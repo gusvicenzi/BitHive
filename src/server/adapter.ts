@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { type Settings, type Snapshot } from '../shared/domain.js';
 import { AppError } from './errors.js';
-import { type Transport, transport } from './network.js';
+import { type Transport, transport, resolveAddress } from './network.js';
 
 const n = z.number().finite().nonnegative().optional();
 const s = z.string().max(255).optional();
@@ -24,18 +24,20 @@ const asicSchema = z.object({ deviceModel: s, frequencyOptions: z.array(z.number
 type Info = z.infer<typeof infoSchema>;
 export interface Reading { snapshot: Snapshot; raw: Info }
 export interface MinerAdapter {
+  stableAddress?(address: string): Promise<string>;
   read(address: string): Promise<Reading>;
   patch(address: string, settings: Settings, reading: Reading): Promise<void>;
 }
 export function normalize(info: Info, asic?: z.infer<typeof asicSchema>): Snapshot {
   const settings: Snapshot['settings'] = {};
-  for (const key of ['frequency', 'coreVoltage', 'autofanspeed', 'manualFanSpeed', 'stratumURL', 'stratumPort', 'stratumUser'] as const) {
+  for (const key of ['hostname', 'frequency', 'coreVoltage', 'autofanspeed', 'manualFanSpeed', 'stratumURL', 'stratumPort', 'stratumUser'] as const) {
     if (info[key] !== undefined) Object.assign(settings, { [key]: info[key] });
   }
   const slot = info.pools?.find(pool => pool.id === (info.primaryPoolIndex ?? 0));
   if (slot) Object.assign(settings, { stratumURL: slot.stratumURL, stratumPort: slot.stratumPort, stratumUser: slot.stratumUser });
   const poolMode = slot ? 'slots' : settings.stratumURL !== undefined && settings.stratumPort !== undefined && settings.stratumUser !== undefined ? 'legacy' : 'none';
   const writable: (keyof Settings)[] = [];
+  if (info.hostname?.trim()) writable.push('hostname');
   if (info.frequency !== undefined && asic?.frequencyOptions.length) writable.push('frequency');
   if (info.coreVoltage !== undefined && asic?.voltageOptions.length) writable.push('coreVoltage');
   if (info.autofanspeed === 0 || info.autofanspeed === 1) writable.push('autofanspeed');
@@ -58,6 +60,7 @@ export function validateCapabilities(settings: Settings, snapshot: Snapshot) {
 }
 export class AxeAdapter implements MinerAdapter {
   constructor(private send: Transport = transport) {}
+  stableAddress(address: string) { return resolveAddress(address); }
   async read(address: string): Promise<Reading> {
     const parsed = infoSchema.safeParse(await this.send(address, '/api/system/info'));
     if (!parsed.success) throw new AppError('invalidDeviceResponse');

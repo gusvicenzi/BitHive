@@ -8,7 +8,7 @@ O BitHive atende quem minera em casa com um ou mais aparelhos Bitaxe/ESP-Miner n
 
 ## Implementado na versão 0.1
 
-- Cadastro por IPv4 privado ou nome de rede, com leitura de modelo, placa, firmware e MAC quando disponíveis.
+- Cadastro por IPv4 privado ou nome de rede, usando automaticamente o nome do AxeOS, com leitura de modelo, placa, firmware e MAC quando disponíveis. Nome de exibição opcional no BitHive.
 - Comparação de hashrate, potência, eficiência em J/TH, temperatura do chip, estado e última atualização bem-sucedida.
 - Totais reais excluem dados desatualizados e mineradores simulados. A eficiência usa potência e hashrate combinados somente dos aparelhos com ambos os dados.
 - Histórico local de hashrate, potência e temperatura; shares aceitas/rejeitadas, erros, temperatura do regulador, atividade, rotação e melhor dificuldade quando informados.
@@ -51,11 +51,19 @@ O compilador e a ferramenta Prisma são dependências locais necessárias na ini
 ### Primeiro uso
 
 1. Clique em **Experimentar demonstração** para explorar três aparelhos simulados. Eles têm identificação explícita e ficam fora dos totais reais. Repetir a ação não cria duplicatas.
-2. Use **Adicionar minerador**, informe um nome e um endereço como `192.168.1.42` ou `bitaxe.local`, sem protocolo, caminho ou porta. A identificação é consultada antes de concluir o cadastro.
+2. Use **Adicionar minerador**, informe um endereço como `192.168.1.42` ou `bitaxe.local`, sem protocolo, caminho ou porta. A identificação e o nome no AxeOS são consultados antes de concluir o cadastro. Deixe o nome de exibição opcional vazio para usar o nome do AxeOS; sem ele, usa-se modelo ou endereço.
 3. Clique no nome do minerador para ver histórico, estatísticas, controles manuais, pool principal e auditoria. O histórico começa no cadastro; dados antigos do firmware não são importados.
 4. Deixe campos vazios para manter seus valores. **Aplicar e verificar** envia uma alteração e relê o aparelho. Senhas nunca são exibidas nem persistidas pelo BitHive e não podem ser confirmadas por releitura.
 5. Selecione várias linhas para ações em lote. As opções vêm do aparelho aberto; cada destino é validado separadamente, com falhas individuais para opções incompatíveis.
 6. Dê um nome aos campos de operação escolhidos para salvar um perfil por aparelho. Carregar um perfil preenche o formulário; aplicar é uma ação separada. Perfis salvos não representam configurações certificadas como estáveis.
+
+### Alteração dos nomes
+
+Nos detalhes, use **Nomes do minerador**. **Nome de exibição no BitHive** altera somente o nome local, inclusive com o aparelho desconectado, e registra a edição no histórico. **Nome no AxeOS (hostname)** altera o aparelho por um único `PATCH /api/system`, seguido de releitura para verificar o resultado. Use de 1 a 63 letras, números ou hífens, começando e terminando com letra ou número. O valor é convertido para minúsculas; não inclua `.local`.
+
+A mudança do hostname altera o nome de rede. Para aparelhos cadastrados por nome de rede, o BitHive resolve e valida o IPv4 privado antes do comando e mantém esse IP para verificação e coleta futura. A alteração é recusada se outro cadastro já usa o IP. Hostnames só podem ser alterados individualmente, sem combinar outras configurações ou selecionar vários mineradores. O controle fica indisponível quando o firmware não informa suporte. Resultados incertos são relatados e não são repetidos automaticamente.
+
+Um nome de exibição igual ao hostname anterior acompanha alterações futuras do hostname. Nomes personalizados e nomes de cadastros existentes são preservados. Mineradores simulados aceitam alterações e as mantêm após reiniciar. Comandos de renomeação ainda não foram testados no Starminer físico; a validação física acima cobre somente leituras.
 
 ## Compatibilidade e interpretação dos resultados
 
