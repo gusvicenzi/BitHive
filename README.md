@@ -4,7 +4,7 @@
 
 [Português do Brasil](README.pt-BR.md)
 
-BitHive is intended for home miners running one or more Bitaxe/ESP-Miner devices on their own network. The initial compatibility target is the owner's **Starminer Bitaxe 601 with customized AxeOS**, alongside official AxeOS. No firmware installation or modification is needed. Exact Starminer hardware compatibility is pending physical validation.
+BitHive is intended for home miners running one or more Bitaxe/ESP-Miner devices on their own network. The initial compatibility target is the owner's **Starminer Bitaxe 601 with customized AxeOS**, alongside official AxeOS. No firmware installation or modification is needed. Read-only monitoring was physically validated on 2026-10-14 against a Starminer reporting GammaV2, board 601a-4, firmware V1.0.1-rc.10. Configuration writes remain untested on physical hardware.
 
 ## Implemented in v0.1
 
@@ -60,7 +60,7 @@ The compiler and Prisma CLI are intentionally installed locally because normal s
 
 The adapter verifies external responses at runtime and detects optional capabilities rather than assuming a device model supports everything. It uses the official system-info, optional ASIC-info, and settings endpoints. If usable frequency/voltage choices are unavailable, those controls stay read-only. Monitoring can continue with partial metrics.
 
-Official AxeOS is supported through the reviewed API contract, including legacy flat primary-pool fields and modern primary pool slots. The owner's Starminer 601 is a priority target, but its customized firmware has **not yet been tested on a physical device**. A version or model name alone does not guarantee compatibility. See [API evidence and implementation decisions](docs/IMPLEMENTATION.md) for the inspected sources and limitations. When reporting a problem, include model/board and firmware versions, sanitized field names, and the failed action. Never upload passwords or full device dumps containing secrets.
+Official AxeOS is supported through the reviewed API contract, including legacy flat primary-pool fields and modern primary pool slots. Read-only monitoring and capability detection were **validated on a physical Starminer 601** on 2026-10-14 (reported model GammaV2, board 601a-4, firmware V1.0.1-rc.10), including registration and local metric persistence. Physical configuration writes remain untested. A version or model name alone does not guarantee compatibility. See [API evidence and implementation decisions](docs/IMPLEMENTATION.md) for the inspected sources and limitations. When reporting a problem, include model/board and firmware versions, sanitized field names, and the failed action. Never upload passwords or full device dumps containing secrets.
 
 Results distinguish **verified**, **not verified**, **unknown outcome**, and **failed**. Verification proves that the device reports the requested public values; it does not prove sustained hashrate, safety, stability, actual payout, or that a firmware restart is unnecessary. Acknowledged writes that do not appear in the subsequent response remain unverified. If a request times out, it is not retried automatically. Check AxeOS before sending it again. Some firmware may require a later restart, which this version does not initiate.
 

@@ -4,7 +4,7 @@
 
 [English](README.md)
 
-O BitHive atende quem minera em casa com um ou mais aparelhos Bitaxe/ESP-Miner na própria rede. A prioridade inicial é o **Starminer Bitaxe 601 do proprietário, com AxeOS personalizado**, além do AxeOS oficial. Não é necessário instalar nem modificar firmware. A compatibilidade com o Starminer físico ainda precisa ser validada.
+O BitHive atende quem minera em casa com um ou mais aparelhos Bitaxe/ESP-Miner na própria rede. A prioridade inicial é o **Starminer Bitaxe 601 do proprietário, com AxeOS personalizado**, além do AxeOS oficial. Não é necessário instalar nem modificar firmware. O monitoramento somente de leitura foi validado em hardware físico em 14/10/2026, com identificação GammaV2, placa 601a-4 e firmware V1.0.1-rc.10. Alterações de configuração ainda não foram testadas no aparelho.
 
 ## Implementado na versão 0.1
 
@@ -61,7 +61,7 @@ O compilador e a ferramenta Prisma são dependências locais necessárias na ini
 
 As respostas dos mineradores são validadas durante a execução e as capacidades opcionais são detectadas. O adaptador usa informações do sistema, informações opcionais do ASIC e configuração de sistema da API oficial. Se o aparelho não informar opções válidas de frequência ou tensão, esses controles ficam somente para leitura. A coleta pode continuar com métricas parciais.
 
-O AxeOS oficial é atendido pelo contrato de API revisado, incluindo campos antigos de pool principal e slots modernos. O Starminer 601 personalizado do proprietário é prioritário, mas **ainda não foi testado em hardware físico**. Nome de modelo ou versão não garante compatibilidade. Consulte [evidências da API e decisões de implementação](docs/IMPLEMENTATION.md), em inglês. Para relatar problemas, informe placa/modelo, versão, nomes de campos sem segredos e ação que falhou. Não publique senhas nem respostas integrais contendo credenciais.
+O AxeOS oficial é atendido pelo contrato de API revisado, incluindo campos antigos de pool principal e slots modernos. O monitoramento e a detecção de capacidades foram **validados em um Starminer 601 físico** em 14/10/2026 (modelo informado GammaV2, placa 601a-4, firmware V1.0.1-rc.10), incluindo cadastro e persistência local das métricas. Alterações de configuração ainda não foram testadas no aparelho. Nome de modelo ou versão não garante compatibilidade. Consulte [evidências da API e decisões de implementação](docs/IMPLEMENTATION.md), em inglês. Para relatar problemas, informe placa/modelo, versão, nomes de campos sem segredos e ação que falhou. Não publique senhas nem respostas integrais contendo credenciais.
 
 Resultados distinguem **verificado**, **não verificado**, **resultado incerto** e **falhou**. A verificação confirma os valores públicos relatados pelo firmware; não comprova desempenho prolongado, estabilidade, segurança, pagamento ou ausência de necessidade de reinício. Alterações aceitas que não aparecem na releitura continuam não verificadas. Comandos com resultado incerto nunca são repetidos automaticamente. Verifique o estado no AxeOS antes de reenviar. Esta versão não reinicia o aparelho.
 
