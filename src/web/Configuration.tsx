@@ -79,6 +79,5 @@ export function Configuration({ device, count, busy, onApply }: { device: Device
       <label>{t('profileName')}<input maxLength={80} value={profileName} onChange={event => setProfileName(event.target.value)} /></label>
       <button type="button" disabled={saving || !profileName.trim() || !Object.keys(values).some(key => ['frequency', 'coreVoltage', 'autofanspeed', 'manualFanSpeed'].includes(key))} onClick={() => void saveProfile()}>{t('saveProfile')}</button>
     </div>{profileError && <p role="alert">{t(`errors.${profileError}`, { defaultValue: t('errors.operationFailed') })}</p>}</details>
-    <details><summary>{t('automaticTuning')}</summary><p className="muted">{t('tuningPlanned')}</p></details>
   </form>;
 }

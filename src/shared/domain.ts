@@ -23,6 +23,11 @@ export interface Snapshot {
   firmware?: string;
   mac?: string;
   hostname?: string;
+  expectedHashrate?: number;
+  actualFrequency?: number;
+  hardwareFault?: boolean;
+  firmwareProtection?: boolean;
+  resetReason?: string;
   hashRate?: number;
   power?: number;
   temp?: number;

@@ -15,3 +15,13 @@
 .summary .power-equation small{font-size:11px}
 
 .difficulty-value{position:relative;display:inline-block}.difficulty-button{font:inherit;color:inherit;padding:0;border:0;border-bottom:1px dotted var(--muted);border-radius:0;background:none;cursor:help}.difficulty-button:hover{background:none;color:var(--blue)}.difficulty-tooltip{position:absolute;right:0;top:calc(100% + 8px);z-index:5;width:max-content;max-width:min(240px,calc(100vw - 64px));padding:10px 12px;background:white;border:1px solid var(--line);box-shadow:0 3px 12px #123c501a;border-radius:6px;font-size:12px;overflow-wrap:anywhere}.difficulty-tooltip strong{font-weight:600}.difficulty-tooltip small{display:block;margin-top:6px;color:var(--muted);font-family:"Avenir Next","Segoe UI",sans-serif;font-size:10px;line-height:1.5}
+
+.tuning { border-top: 1px solid var(--border, #d8e3e7); margin-top: 24px; padding-top: 20px; min-width: 0; }
+.tuning details, .tuning-progress { margin: 16px 0; }
+.tuning-winners { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin: 18px 0; }
+.tuning-winner { padding: 16px; background: #f1f7f8; border-radius: 8px; }
+.tuning caption { text-align: left; padding: 12px; font-weight: 600; }
+.tuning table { min-width: 1300px; }
+.tuning .table-scroll { max-width: 100%; overflow-x: auto; }
+.tuning td small { display: block; }
+@media (max-width: 600px) { .tuning-winners { grid-template-columns: 1fr; } }

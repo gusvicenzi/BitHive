@@ -19,6 +19,7 @@ model Device {
   events      Event[]
   changes     ConfigChange[]
   profiles    Profile[]
+  tuningRuns  TuningRun[]
   @@index([nextPoll])
 }
 model Profile {
@@ -65,4 +66,56 @@ model ConfigChange {
   result      String
   @@index([deviceId, timestamp])
   @@index([timestamp])
+}
+
+model TuningRun {
+  id          String   @id @default(cuid())
+  deviceId    String
+  device      Device   @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  requestKey  String
+  activeSlot  Int?     @unique
+  config      String
+  state       String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  attempts    TuningAttempt[]
+  checkpoints TuningCheckpoint[]
+  @@unique([deviceId, requestKey])
+  @@index([deviceId, createdAt])
+}
+model TuningAttempt {
+  id          String   @id @default(cuid())
+  runId       String
+  run         TuningRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  kind        String
+  profile     String
+  candidateId String?
+  outcome     String   @default("pending")
+  reason      String?
+  summary     String?
+  auditId     Int?
+  startedAt   DateTime @default(now())
+  completedAt DateTime?
+  samples     TuningSample[]
+  @@index([runId, startedAt])
+}
+model TuningSample {
+  id          Int      @id @default(autoincrement())
+  attemptId   String
+  attempt     TuningAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  timestamp   DateTime
+  phase       String
+  data        String
+  @@index([attemptId, timestamp])
+}
+model TuningCheckpoint {
+  id          Int      @id @default(autoincrement())
+  runId       String
+  run         TuningRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  timestamp   DateTime @default(now())
+  profile     String
+  purpose     String
+  status      String
+  auditId     Int?
+  @@index([runId, timestamp])
 }

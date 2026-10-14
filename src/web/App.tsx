@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { aggregate, efficiency, type ActionResult, type DeviceView, type MetricView, type Settings } from '../shared/domain';
 import { api } from './api';
+import { Tuning } from './Tuning';
 import { Chart } from './Chart';
 import { Configuration } from './Configuration';
 import { DeviceNaming } from './DeviceNaming';
@@ -102,6 +103,7 @@ export function App() {
       {historyError ? <p role="alert">{t(`errors.${historyError}`, { defaultValue: t('errors.operationFailed') })}</p> : !history ? <p role="status">{t('loading')}</p> : <><div className="charts"><Chart metrics={history.metrics} field="hashRate" unit="GH/s" label={t('hashrate')} /><Chart metrics={history.metrics} field="power" unit="W" label={t('power')} /><Chart metrics={history.metrics} field="temp" unit="°C" label={t('temperature')} /></div><p className="muted">{t('historyLimit', { count: history.limit })}</p></>}
       <DeviceNaming key={`names-${detail.id}`} device={detail} busy={busy} onUpdated={() => reload()} />
       <Configuration key={detail.id} device={detail} count={selected.includes(detail.id) ? selected.length : 1} busy={busy} onApply={settings => batch(selected.includes(detail.id) ? selected : [detail.id], settings)} />
+      <Tuning key={`tuning-${detail.id}`} device={detail} />
       <div className="audit-grid"><div><h3>{t('deviceEvents')}</h3>{history?.events.length ? history.events.map(event => <p key={event.id}><time>{date(event.timestamp)}</time> {t(`events.${event.kind}`, { defaultValue: t('events.observed') })}</p>) : <p className="muted">{t('noEvents')}</p>}</div><div><h3>{t('configurationHistory')}</h3>{history?.changes.length ? history.changes.map(change => <details key={change.id}><summary>{date(change.timestamp)} · {t(`results.${change.result}`, { defaultValue: t('results.observed') })}</summary><dl>{Object.entries(JSON.parse(change.result === 'observed' ? change.after ?? '{}' : change.requested)).map(([key, value]) => <div key={key}><dt>{t(key)}</dt><dd>{typeof value === 'number' ? number(value) : typeof value === 'boolean' ? t('changed') : String(value)}</dd></div>)}</dl></details>) : <p className="muted">{t('noChanges')}</p>}</div></div>
     </section>}
     <footer id="activity"><span>BitHive <span className="tag">v0.1.0</span></span><span>{t('footer')}</span></footer>

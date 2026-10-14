@@ -9,6 +9,8 @@ export const infoSchema = z.object({
   ASICModel: s, deviceModel: s, boardVersion: s, version: s, axeOSVersion: s, macAddr: s, hostname: s,
   hashRate: n, power: n, temp: n, vrTemp: n, errorPercentage: n, sharesAccepted: n, sharesRejected: n,
   uptimeSeconds: n, fanrpm: n, bestDiff: z.union([z.string().max(64), z.number().finite()]).optional(),
+  expectedHashrate: n, actualFrequency: n, overheat_mode: n, miningPaused: z.boolean().optional(),
+  resetReason: s, hardware_fault: s, power_fault: s,
   frequency: n, coreVoltage: n, autofanspeed: n, manualFanSpeed: n,
   stratumURL: s, stratumPort: n, stratumUser: s, primaryPoolIndex: n,
   pools: z.array(z.object({ id: z.number().int().min(0).max(7), stratumURL: z.string().max(255),
@@ -26,6 +28,7 @@ export interface Reading { snapshot: Snapshot; raw: Info }
 export interface MinerAdapter {
   stableAddress?(address: string): Promise<string>;
   read(address: string): Promise<Reading>;
+  patchTuning?(address: string, settings: Settings, reading: Reading): Promise<void>;
   patch(address: string, settings: Settings, reading: Reading): Promise<void>;
 }
 export function normalize(info: Info, asic?: z.infer<typeof asicSchema>): Snapshot {
@@ -46,6 +49,9 @@ export function normalize(info: Info, asic?: z.infer<typeof asicSchema>): Snapsh
   return {
     model: asic?.deviceModel ?? info.deviceModel ?? info.ASICModel, board: info.boardVersion,
     firmware: info.version ?? info.axeOSVersion, mac: info.macAddr, hostname: info.hostname,
+    expectedHashrate: info.expectedHashrate, actualFrequency: info.actualFrequency,
+    firmwareProtection: info.overheat_mode === undefined ? undefined : info.overheat_mode !== 0,
+    hardwareFault: Boolean(info.hardware_fault || info.power_fault || info.miningPaused), resetReason: info.resetReason,
     hashRate: info.hashRate, power: info.power, temp: info.temp, vrTemp: info.vrTemp,
     errorRate: info.errorPercentage, accepted: info.sharesAccepted, rejected: info.sharesRejected,
     uptime: info.uptimeSeconds, fanRpm: info.fanrpm, bestDiff: info.bestDiff?.toString(), settings,
