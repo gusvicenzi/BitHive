@@ -215,9 +215,9 @@
     "hashrate": "Confirmed maximum hashrate",
     "efficiency": "Confirmed best efficiency",
     "noWinner": "No confirmed winner",
-    "confirmed": "Confirmed; see the confirmation attempt in results",
+    "confirmed": "Confirmed",
     "applyWinner": "Apply confirmed winner",
-    "attempts": "Persistent tuning attempts",
+    "attempts": "Tuning attempts",
     "incomplete": "Incomplete measurement",
     "previous": "Previous results",
     "next": "Next results",
@@ -307,6 +307,46 @@
       "applyWinner": "Explicit winner application",
       "winnerApplyFailed": "Winner application failed",
       "counterReset": "Share counter reset invalidated measurement"
+    },
+    "design": {
+      "eyebrow": "Frequency × voltage",
+      "window": "Operating window",
+      "windowDescription": "Current profile: {{frequency}} MHz, {{voltage}} mV. Search bounds: {{fmin}} to {{fmax}} MHz and {{vmin}} to {{vmax}} mV.",
+      "currentPoint": "Current profile within the search bounds",
+      "outsideWindow": "Current profile is outside the search bounds",
+      "workflow": "Tuning workflow",
+      "stages": {
+        "baseline": "Baseline",
+        "search": "Sweep",
+        "confirmation": "Confirmation",
+        "restore": "Restore"
+      },
+      "currentPhase": "Current phase",
+      "currentProfile": "Operating profile",
+      "savedOnServer": "Saved on server",
+      "runSaved": "Run saved",
+      "phaseRemaining": "Time remaining",
+      "phaseProgress": "Current phase progress",
+      "liveReadings": "Live tuning readings",
+      "metrics": {
+        "ths": "Hashrate",
+        "watts": "Miner power",
+        "efficiency": "Efficiency",
+        "asic": "ASIC temperature",
+        "vrm": "VRM temperature",
+        "error": "Hash error"
+      },
+      "limit": "Limit {{value}} {{unit}}",
+      "winnerPending": "Passing candidates need a longer confirmation before they appear here.",
+      "setupHint": "Operating bounds, limits and observation time",
+      "groups": {
+        "window": "Search bounds",
+        "limits": "Temperature & performance limits",
+        "observation": "Observation & control"
+      },
+      "rangeHint": "Frequency increases within each voltage sweep. Bounds start with the AxeOS preset range.",
+      "resultScroll": "Tuning results; scroll horizontally for all measurements",
+      "runningOnServer": "Running on server"
     }
   }
 }

@@ -215,9 +215,9 @@
     "hashrate": "Maior hashrate confirmado",
     "efficiency": "Melhor eficiência confirmada",
     "noWinner": "Nenhum vencedor confirmado",
-    "confirmed": "Confirmado; veja a tentativa de confirmação nos resultados",
+    "confirmed": "Confirmado",
     "applyWinner": "Aplicar vencedor confirmado",
-    "attempts": "Tentativas de ajuste persistidas",
+    "attempts": "Tentativas de ajuste",
     "incomplete": "Medição incompleta",
     "previous": "Resultados anteriores",
     "next": "Próximos resultados",
@@ -307,6 +307,46 @@
       "applyWinner": "Aplicação explícita do vencedor",
       "winnerApplyFailed": "Falha ao aplicar o vencedor",
       "counterReset": "Reinício dos contadores de shares invalidou a medição"
+    },
+    "design": {
+      "eyebrow": "Frequência × tensão",
+      "window": "Faixa de operação",
+      "windowDescription": "Perfil atual: {{frequency}} MHz, {{voltage}} mV. Limites da busca: {{fmin}} a {{fmax}} MHz e {{vmin}} a {{vmax}} mV.",
+      "currentPoint": "Perfil atual dentro dos limites da busca",
+      "outsideWindow": "O perfil atual está fora dos limites da busca",
+      "workflow": "Etapas do ajuste",
+      "stages": {
+        "baseline": "Inicial",
+        "search": "Varredura",
+        "confirmation": "Confirmação",
+        "restore": "Restaurar"
+      },
+      "currentPhase": "Etapa atual",
+      "currentProfile": "Perfil de operação",
+      "savedOnServer": "Salvo no servidor",
+      "runSaved": "Ajuste salvo",
+      "phaseRemaining": "Tempo restante",
+      "phaseProgress": "Progresso da etapa atual",
+      "liveReadings": "Leituras do ajuste ao vivo",
+      "metrics": {
+        "ths": "Hashrate",
+        "watts": "Potência do minerador",
+        "efficiency": "Eficiência",
+        "asic": "Temperatura ASIC",
+        "vrm": "Temperatura VRM",
+        "error": "Erro de hash"
+      },
+      "limit": "Limite {{value}} {{unit}}",
+      "winnerPending": "Candidatos aprovados precisam de uma confirmação mais longa para aparecer aqui.",
+      "setupHint": "Faixas de operação, limites e tempo de observação",
+      "groups": {
+        "window": "Limites da busca",
+        "limits": "Limites térmicos e de desempenho",
+        "observation": "Observação e controle"
+      },
+      "rangeHint": "A frequência aumenta em cada faixa de tensão. Os limites começam na faixa de presets do AxeOS.",
+      "resultScroll": "Resultados do ajuste; role na horizontal para ver todas as medições",
+      "runningOnServer": "Executando no servidor"
     }
   }
 }
