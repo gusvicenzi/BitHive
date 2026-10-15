@@ -13,6 +13,7 @@ export class DemoAdapter implements MinerAdapter {
       ...settings, ASICModel: index === 3 ? 'BM1366' : 'BM1370', deviceModel: index === 1 ? 'Starminer 601' : index === 3 ? 'Ultra' : 'Gamma',
       version: 'demo-0.1', boardVersion: index === 3 ? '401' : '601', macAddr: `02:00:00:00:00:0${index}`, hostname: settings.hostname ?? address,
       hashRate: (index === 3 ? 520 : 1200) * (settings.frequency ?? 525) / 525 + wave * 32,
+      voltage: 5100 + index * 10,
       power: index === 3 ? 12.8 : 17.2 + index, temp: 49 + index * 2 + wave,
       vrTemp: 56 + index, errorPercentage: 0.2, sharesAccepted: Math.floor(Date.now() / 30000) % 10000,
       sharesRejected: index, uptimeSeconds: Math.floor(Date.now() / 1000) % 100000, fanrpm: 3900 + index * 100, bestDiff: '2.41G',

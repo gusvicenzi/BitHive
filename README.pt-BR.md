@@ -71,6 +71,10 @@ Os gráficos de hashrate usam TH/s quando alguma leitura no histórico exibido s
 
 O cartão **Consumo de energia** normalmente mostra a potência informada pelos mineradores conectados. Ative **Incluir perdas da fonte** para ver potência informada + perda estimada da fonte = consumo estimado da tomada, com cores distintas para perda e total. A **Eficiência da fonte (%)** começa em **85%**, uma hipótese ajustável, não uma medição. O consumo estimado é a potência informada dividida pela eficiência / 100; a perda é a diferença. Com 85%, 56,7 W resulta aproximadamente em `56,7 + 10,0 = 66,7 W`. A eficiência deve ser maior que 0% e de no máximo 100%. Os valores exibidos são arredondados de forma consistente para que a soma confira.
 
+Clique no total de watts da tomada para informar a leitura de um wattímetro para a frota online e selecione **Usar leitura** (ou pressione Enter). A eficiência da fonte é calculada como potência informada pelos mineradores / potência medida na tomada × 100. A leitura deve ser positiva e igual ou maior que a potência informada; a calibração exige potência dos mineradores maior que zero. O percentual calculado fica salvo e é usado em estimativas futuras conforme a potência muda.
+
+Com as perdas da fonte ativadas, o cartão **Eficiência** da frota mostra J/TH na tomada, dividindo a eficiência dos mineradores com leituras combinadas pela fração de eficiência da fonte. Uma eficiência de fonte inválida deixa esse valor indisponível.
+
 A estimativa usa uma única eficiência para a frota. Leituras ausentes ou desatualizadas são excluídas ou indicadas como parciais; simulações continuam fora dos totais reais. A opção não altera potência registrada, configuração, eficiência dos aparelhos nem gráficos históricos. A opção e a eficiência ficam salvas neste navegador; sem armazenamento disponível, funcionam na sessão atual.
 
 ## Compatibilidade e interpretação dos resultados

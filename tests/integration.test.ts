@@ -20,6 +20,15 @@ afterAll(async () => { await app?.close(); await fixture?.close(); });
 async function miner() { return service.register('192.168.1.42', 'Test Gamma'); }
 
 describe('migration and persistence', () => {
+  it('persists normalized input voltage and exposes it after a service restart', async () => {
+    const device = await miner();
+    const stored = await fixture.db.device.findUniqueOrThrow({ where: { id: device.id } });
+    expect(JSON.parse(stored.snapshot).inputVoltage).toBeCloseTo(5.11);
+    const restarted = new FleetService(fixture.db, hardware);
+    expect((await restarted.list())[0].snapshot?.inputVoltage).toBeCloseTo(5.11);
+    const response = await app.inject({ url: '/api/devices', headers });
+    expect(response.json()[0].snapshot.inputVoltage).toBeCloseTo(5.11);
+  });
   it('deploys committed migrations twice without losing existing user data', async () => {
     const device = await miner(); fixture.migrate();
     const second = new PrismaClient({ datasources: { db: { url: fixture.url } } });

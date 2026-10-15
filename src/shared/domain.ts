@@ -25,6 +25,8 @@ export interface Snapshot {
   hostname?: string;
   hashRate?: number;
   power?: number;
+  /** Measured supply input voltage in volts. */
+  inputVoltage?: number;
   temp?: number;
   vrTemp?: number;
   errorRate?: number;

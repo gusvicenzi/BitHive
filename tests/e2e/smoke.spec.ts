@@ -10,7 +10,10 @@ test('first run, demonstration fleet, configuration readback and language', asyn
   await expect(page.getByLabel('Power supply efficiency (%)')).toHaveValue('85');
   await page.getByLabel('Power supply efficiency (%)').fill('90');
   await expect(page.getByText(/wall estimate · 90% efficiency/)).toBeVisible();
+  await expect(page.getByRole('columnheader', { name: 'Input voltage', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Bitaxe 1', exact: true }).locator('xpath=ancestor::tr')).toContainText('5.11');
   await page.getByRole('button', { name: 'Bitaxe 1', exact: true }).click();
+  await expect(page.locator('.device-facts div').filter({ has: page.getByText('Input voltage', { exact: true }) })).toContainText('5.11 V');
   await expect(page.getByText('Starminer 601').first()).toBeVisible();
   await page.getByLabel('Frequency (MHz)').selectOption('550');
   await page.getByRole('button', { name: 'Apply & verify' }).click();
@@ -44,6 +47,8 @@ test('first run, demonstration fleet, configuration readback and language', asyn
   await expect(page.getByRole('heading', { name: 'Office miner', exact: true })).toBeVisible();
   await page.screenshot({ path: 'test-results/bithive-detail.png', fullPage: true });
   await page.getByLabel('Language').selectOption('pt-BR');
+  await expect(page.getByRole('columnheader', { name: 'Tensão de entrada', exact: true })).toBeVisible();
+  await expect(page.locator('.device-facts div').filter({ has: page.getByText('Tensão de entrada', { exact: true }) })).toContainText('5,11 V');
   await expect(page.getByRole('heading', { name: 'Sua colmeia, à vista.' })).toBeVisible();
   await page.reload();
   await expect(page.getByRole('heading', { name: 'Sua colmeia, à vista.' })).toBeVisible();
@@ -70,6 +75,17 @@ test('graph TH/s, fleet hash errors and nonzero power-supply estimates', async (
   await expect(page.getByRole('button', { name: 'Office miner' }).locator('xpath=ancestor::tr')).toContainText('0.93');
   await page.getByRole('checkbox', { name: 'Include power supply losses' }).check();
   await expect(page.getByLabel(/Miner power 56.7 W/)).toContainText('56.7+10.0=66.7 W');
+  const efficiencyCard = page.locator('.summary article').filter({ hasText: 'J/TH' });
+  await expect(efficiencyCard).toContainText('Includes power supply losses');
+  await page.getByRole('button', { name: 'Enter actual wall power' }).click();
+  await page.getByLabel('Measured wall power (W)').fill('70');
+  await page.getByLabel('Measured wall power (W)').press('Enter');
+  await expect(page.getByLabel('Power supply efficiency (%)')).toHaveValue('81');
+  await expect(page.getByLabel(/Miner power 56.7 W/)).toContainText('56.7+13.3=70.0 W');
+  await expect(efficiencyCard.locator('strong')).toContainText('40.89');
+  await page.reload();
+  await expect(page.getByLabel('Power supply efficiency (%)')).toHaveValue('81');
+  await expect(efficiencyCard.locator('strong')).toContainText('40.89');
   await page.locator('.summary').screenshot({ path: 'test-results/bithive-power-estimate.png' });
   await page.getByRole('button', { name: 'Office miner', exact: true }).click();
   const difficulty = page.getByRole('button', { name: 'Show full best difficulty' });

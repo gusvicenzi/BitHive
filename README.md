@@ -70,6 +70,10 @@ Hashrate charts automatically use TH/s when any reading in the displayed history
 
 The **Power draw** card normally shows online miners' reported power. Enable **Include power supply losses** to show reported watts + estimated supply loss = estimated wall draw, with distinct colors for the loss and total. **Power supply efficiency (%)** defaults to **85%**, an editable assumption rather than a measurement. Estimated wall draw = reported miner power / (efficiency / 100); loss is the difference. At 85%, 56.7 W becomes approximately `56.7 + 10.0 = 66.7 W`. Efficiency must be greater than 0% and at most 100%. The displayed components are rounded consistently to add up.
 
+Click the total wall watts to enter a wattmeter reading for the online fleet, then select **Use reading** (or press Enter). Supply efficiency is calculated as reported miner watts / measured wall watts × 100. A reading must be positive and at least the reported miner power; calibration requires nonzero miner power. The calculated percentage is saved and used for future estimates as miner power changes.
+
+With supply losses enabled, the fleet **Efficiency** card shows wall J/TH by dividing the paired-reading miner efficiency by the supply efficiency fraction. Invalid supply efficiency leaves this value unavailable.
+
 The estimate uses one fleet-wide efficiency assumption. Missing or stale readings are excluded or marked partial, and demo miners remain outside real totals. This option does not change recorded power, miner configuration, device efficiency, or historical charts. The toggle and efficiency are saved in this browser; if browser storage is unavailable, they work for the current session.
 
 ## Compatibility and command semantics

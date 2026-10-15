@@ -1,9 +1,17 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { powerEstimate, readPowerPreferences, POWER_PREFERENCE_KEY } from '../src/web/power-estimate';
+import { efficiencyFromWallPower, powerEstimate, readPowerPreferences, POWER_PREFERENCE_KEY } from '../src/web/power-estimate';
 
 afterEach(() => { localStorage.clear(); vi.restoreAllMocks(); });
 describe('power supply estimates', () => {
+  it('derives supply efficiency from a wattmeter reading', () => {
+    expect(efficiencyFromWallPower(56.7, 70)).toBeCloseTo(81);
+    expect(powerEstimate(56.7, efficiencyFromWallPower(56.7, 70)!)!.total).toBeCloseTo(70);
+    expect(efficiencyFromWallPower(56.7, 56.7)).toBe(100);
+  });
+  it.each([[0, 0], [0, 10], [10, 0], [10, 9], [-1, 10], [NaN, 10], [10, Infinity], [Infinity, Infinity]])('rejects unusable calibration %s / %s', (power, wall) => {
+    expect(efficiencyFromWallPower(power, wall)).toBeNull();
+  });
   it('calculates wall input from efficiency rather than adding an arbitrary percentage', () => {
     const result = powerEstimate(56.7, 85)!;
     expect(result.total).toBeCloseTo(66.705882);

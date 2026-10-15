@@ -6,6 +6,21 @@ import { AppError } from '../src/server/errors.js';
 const info = { ASICModel: 'BM1370', boardVersion: '601', version: 'fixture', hashRate: 1200, power: 18, temp: 52, frequency: 525, coreVoltage: 1150, autofanspeed: 1, manualFanSpeed: 60, stratumURL: 'pool.example.com', stratumPort: 3333, stratumUser: 'example.worker', wifiPass: 'never-store-this', stratumPassword: 'never-store-this' };
 const asic = { deviceModel: 'Gamma', frequencyOptions: [500, 525, 550], voltageOptions: [1100, 1150, 1200] };
 describe('AxeOS adapter', () => {
+  it.each([5208.75, 12000, 0])('converts input voltage %s mV to volts without changing core voltage', async voltage => {
+    const adapter = new AxeAdapter(async (_host, path) => path.endsWith('/asic') ? asic : { ...info, voltage });
+    const reading = await adapter.read('bitaxe.local');
+    expect(reading.raw.voltage).toBe(voltage);
+    expect(reading.snapshot.inputVoltage).toBe(voltage / 1000);
+    expect(reading.snapshot.settings.coreVoltage).toBe(1150);
+    expect(reading.snapshot.capabilities.writable).not.toContain('inputVoltage');
+  });
+  it('keeps missing input voltage unavailable', () => {
+    expect(normalize(infoSchema.parse(info)).inputVoltage).toBeUndefined();
+  });
+  it.each([-1, Infinity, NaN, '5200', null])('rejects invalid input voltage %s', async voltage => {
+    const adapter = new AxeAdapter(async () => ({ ...info, voltage }));
+    await expect(adapter.read('bitaxe.local')).rejects.toThrow('invalidDeviceResponse');
+  });
   it('normalizes identity, capabilities and metrics without credentials', async () => {
     const send = vi.fn(async (_host: string, path: string) => path.endsWith('/asic') ? asic : info);
     const reading = await new AxeAdapter(send).read('192.168.1.2');

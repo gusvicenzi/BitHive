@@ -7,7 +7,7 @@ const n = z.number().finite().nonnegative().optional();
 const s = z.string().max(255).optional();
 export const infoSchema = z.object({
   ASICModel: s, deviceModel: s, boardVersion: s, version: s, axeOSVersion: s, macAddr: s, hostname: s,
-  hashRate: n, power: n, temp: n, vrTemp: n, errorPercentage: n, sharesAccepted: n, sharesRejected: n,
+  hashRate: n, power: n, voltage: n, temp: n, vrTemp: n, errorPercentage: n, sharesAccepted: n, sharesRejected: n,
   uptimeSeconds: n, fanrpm: n, bestDiff: z.union([z.string().max(64), z.number().finite()]).optional(),
   frequency: n, coreVoltage: n, autofanspeed: n, manualFanSpeed: n,
   stratumURL: s, stratumPort: n, stratumUser: s, primaryPoolIndex: n,
@@ -46,6 +46,8 @@ export function normalize(info: Info, asic?: z.infer<typeof asicSchema>): Snapsh
   return {
     model: asic?.deviceModel ?? info.deviceModel ?? info.ASICModel, board: info.boardVersion,
     firmware: info.version ?? info.axeOSVersion, mac: info.macAddr, hostname: info.hostname,
+    // AxeOS reports supply voltage in millivolts; snapshots use volts.
+    inputVoltage: info.voltage === undefined ? undefined : info.voltage / 1000,
     hashRate: info.hashRate, power: info.power, temp: info.temp, vrTemp: info.vrTemp,
     errorRate: info.errorPercentage, accepted: info.sharesAccepted, rejected: info.sharesRejected,
     uptime: info.uptimeSeconds, fanRpm: info.fanrpm, bestDiff: info.bestDiff?.toString(), settings,

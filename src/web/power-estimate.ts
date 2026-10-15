@@ -7,6 +7,11 @@ export function powerEstimate(power: number, efficiency: number) {
   if (!Number.isFinite(total)) return null;
   return { reported: power, loss: total - power, total };
 }
+export function efficiencyFromWallPower(power: number, wallPower: number) {
+  if (!Number.isFinite(power) || power <= 0 || !Number.isFinite(wallPower) || wallPower < power) return null;
+  const efficiency = power / wallPower * 100;
+  return validEfficiency(efficiency) ? efficiency : null;
+}
 export function readPowerPreferences() {
   const fallback = { enabled: false, efficiency: DEFAULT_PSU_EFFICIENCY };
   try {
