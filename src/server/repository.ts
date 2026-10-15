@@ -28,6 +28,10 @@ export async function retention(db: PrismaClient, now = Date.now()) {
   await db.$transaction([
     db.metric.deleteMany({ where: { timestamp: { lt: cutoff(30) } } }),
     db.event.deleteMany({ where: { timestamp: { lt: cutoff(90) } } }),
-    db.configChange.deleteMany({ where: { timestamp: { lt: cutoff(365) } } }),
+    // Tuning checkpoints keep their command audit evidence independently of
+    // ordinary configuration-history retention.
+    db.$executeRaw`DELETE FROM "ConfigChange" WHERE "timestamp" < ${cutoff(365)}
+      AND "id" NOT IN (SELECT "auditId" FROM "TuningAttempt" WHERE "auditId" IS NOT NULL
+        UNION SELECT "auditId" FROM "TuningCheckpoint" WHERE "auditId" IS NOT NULL)`,
   ]);
 }

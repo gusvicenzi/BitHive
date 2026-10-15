@@ -15,10 +15,10 @@ test('first run, demonstration fleet, configuration readback and language', asyn
   await page.getByRole('button', { name: 'Bitaxe 1', exact: true }).click();
   await expect(page.locator('.device-facts div').filter({ has: page.getByText('Input voltage', { exact: true }) })).toContainText('5.11 V');
   await expect(page.getByText('Starminer 601').first()).toBeVisible();
-  await page.getByLabel('Frequency (MHz)').selectOption('550');
+  await page.getByRole('combobox', { name: 'Frequency (MHz)', exact: true }).selectOption('550');
   await page.getByRole('button', { name: 'Apply & verify' }).click();
   await expect(page.getByText('Verified', { exact: true }).first()).toBeVisible();
-  await expect(page.getByLabel('Frequency (MHz)').locator('option').first()).toContainText('550');
+  await expect(page.getByRole('combobox', { name: 'Frequency (MHz)', exact: true }).locator('option').first()).toContainText('550');
   for (const [label, unit] of [['Hashrate', 'TH/s'], ['Power', 'W'], ['Chip temperature', '°C']]) {
     const chart = page.getByRole('slider', { name: `Inspect ${label} history` });
     await expect(page.getByLabel(`${label} scale (${unit})`)).toBeVisible();

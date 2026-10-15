@@ -2,11 +2,13 @@ import Fastify from 'fastify';
 import staticFiles from '@fastify/static';
 import { z, ZodError } from 'zod';
 import type { PrismaClient } from '@prisma/client';
+import { registerTuningRoutes } from './tuning-routes.js';
+import { Tuner } from './tuning.js';
 import { FleetService } from './service.js';
 import { AppError } from './errors.js';
 import { settingsSchema, addressSchema, displayNameSchema } from '../shared/domain.js';
 
-export async function createApp(db: PrismaClient, options: { service?: FleetService; webRoot?: string; dev?: boolean } = {}) {
+export async function createApp(db: PrismaClient, options: { service?: FleetService; tuner?: Tuner; webRoot?: string; dev?: boolean } = {}) {
   const app = Fastify({ logger: false, bodyLimit: 16384, requestTimeout: 30000 });
   const service = options.service ?? new FleetService(db);
   app.setErrorHandler((error, _req, reply) => {
@@ -33,6 +35,7 @@ export async function createApp(db: PrismaClient, options: { service?: FleetServ
     reply.header('Cache-Control', 'no-store');
     return payload;
   });
+  registerTuningRoutes(app, options.tuner ?? new Tuner(service));
   app.get('/api/health', () => ({ status: 'ok' }));
   app.get('/api/devices', () => service.list());
   app.post('/api/devices', async (req, reply) => {
