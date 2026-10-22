@@ -91,7 +91,7 @@
   "manualControl": "MANUAL CONTROL",
   "configuration": "Miner configuration",
   "targetCount": "{{count}} target(s)",
-  "configureHint": "Leave a field empty to keep its current value. Only device-reported operating options are available.",
+  "configureHint": "Leave a field empty to keep its current value. Use device presets or acknowledge the risks to enter custom frequency and voltage.",
   "batchHint": "Options shown come from this miner. Every selected miner is checked independently; incompatible settings are rejected for that miner.",
   "operatingProfile": "Operating profile",
   "frequency": "Frequency (MHz)",
@@ -117,6 +117,7 @@
   "chooseProfile": "Choose a profile",
   "profileName": "Profile name",
   "saveProfile": "Save operating fields",
+  "saveProfileHint": "Enter a name to save the current operating settings, including any pending edits. Saving a profile does not apply settings to the miner.",
   "automaticTuning": "Automatic tuning",
   "errors": {
     "invalidInput": "Check the entered values and try again.",
@@ -135,13 +136,16 @@
     "profileLimit": "This miner already has 20 saved profiles.",
     "operationFailed": "The operation failed. Check the server and network, then try again.",
     "tuningOwnsDevice": "Tuning or recovery owns this miner. Stop the run and verify restoration before changing settings.",
-    "tuningNotValidated": "Physical tuning has not been validated for this firmware.",
+    "tuningNotValidated": "This device adapter does not support automatic tuning.",
     "tuningAlreadyActive": "Another tuning run owns the tuning slot.",
     "idempotencyConflict": "This request identifier was already used with different settings.",
     "tuningNotActive": "This run does not allow that action.",
     "tuningCannotResume": "This run cannot resume until restoration is verified and safety faults are resolved.",
     "noConfirmedWinner": "No confirmed winner is available.",
-    "unsafeRecovery": "Recovery would increase voltage after a safety stop."
+    "unsafeRecovery": "Recovery would increase voltage after a safety stop.",
+    "physicalTuningAcknowledgementRequired": "Acknowledge the risks before starting automatic tuning on this physical miner.",
+    "missingActualFrequency": "This firmware does not report a valid actualFrequency. You can acknowledge using configured frequency for this run.",
+    "missingConfiguredFrequency": "The configured frequency is missing or invalid. Tuning cannot continue."
   },
   "results": {
     "verified": "Verified",
@@ -199,7 +203,7 @@
   "tuner": {
     "oneMiner": "One miner at a time",
     "hostRequired": "Tuning continues when this browser closes. Keep the BitHive server running and connected; sleeping or unreachable hosts cannot restore miners.",
-    "physicalGate": "Physical tuning is disabled: firmware writes, live application, readback and restoration require independent device validation. Starminer monitoring validation is insufficient.",
+    "physicalGate": "Automatic tuning changes frequency, voltage and fan settings and can cause instability, overheating or hardware damage. Confirm that manual changes work on this firmware and review every limit. BitHive will attempt to restore original settings on pause, stop or completion; restoration requires a running server and a reachable miner. This acknowledgement applies to this run, including recovery after a server restart.",
     "setup": "Set up a tuning run",
     "bounds": "Explicit operating bounds and limits",
     "mode": "Search mode",
@@ -313,7 +317,9 @@
       "candidateFailed": "Candidate failed",
       "applyWinner": "Explicit winner application",
       "winnerApplyFailed": "Winner application failed",
-      "counterReset": "Share counter reset invalidated measurement"
+      "counterReset": "Share counter reset invalidated measurement",
+      "missingActualFrequency": "This firmware does not report a valid actualFrequency. You can acknowledge using configured frequency for this run.",
+      "missingConfiguredFrequency": "The configured frequency is missing or invalid. Tuning cannot continue."
     },
     "design": {
       "eyebrow": "Frequency × voltage",
@@ -354,6 +360,16 @@
       "rangeHint": "Frequency increases within each voltage sweep. Bounds start with the AxeOS preset range.",
       "resultScroll": "Tuning results; scroll horizontally for all measurements",
       "runningOnServer": "Running on server"
-    }
-  }
+    },
+    "physicalAcknowledgement": "I understand the risks and authorize automatic tuning on this miner",
+    "configuredFrequencyWarning": "Configured frequency is the firmware setting, not independent confirmation of the applied ASIC clock. Using it cannot detect clock ramping or throttling through actualFrequency. Temperature, hashrate, error checks and setting readback remain required. This choice is saved for the whole run, including resume and recovery.",
+    "acknowledgeConfiguredFrequency": "I acknowledge this limitation — use configured frequency for this run",
+    "configuredFrequencyActive": "Frequency source: configured setting (acknowledged). Applied ASIC clock is not independently verified."
+  },
+  "customValuesAcknowledgement": "I understand the risks and want to enter custom frequency and voltage values",
+  "customValuesHint": "Custom values can cause instability, overheating or hardware damage. Check the limits for your miner and power supply. This acknowledgement only unlocks manual inputs in BitHive; it does not enable AxeOS OC mode or automatic tuning.",
+  "customValueRequiresAcknowledgement": "{{value}} (custom · acknowledgement required)",
+  "customValuesAcknowledged": "Custom values acknowledged",
+  "physicalTuningAcknowledged": "Physical tuning acknowledged",
+  "configuredFrequencyAcknowledged": "Configured frequency acknowledged"
 }

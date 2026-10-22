@@ -1,5 +1,6 @@
 import { z } from 'zod';
-import { type Settings, type Snapshot } from '../shared/domain.js';
+import { settingsSchema, type Settings, type Snapshot } from '../shared/domain.js';
+import { profileSchema, type TuningProfile } from '../shared/tuning.js';
 import { AppError } from './errors.js';
 import { type Transport, transport, resolveAddress } from './network.js';
 
@@ -28,8 +29,8 @@ export interface Reading { snapshot: Snapshot; raw: Info }
 export interface MinerAdapter {
   stableAddress?(address: string): Promise<string>;
   read(address: string): Promise<Reading>;
-  patchTuning?(address: string, settings: Settings, reading: Reading): Promise<void>;
-  patch(address: string, settings: Settings, reading: Reading): Promise<void>;
+  patchTuning?(address: string, settings: TuningProfile, reading: Reading): Promise<void>;
+  patch(address: string, settings: Settings, reading: Reading, customValuesAcknowledged?: boolean): Promise<void>;
 }
 export function normalize(info: Info, asic?: z.infer<typeof asicSchema>): Snapshot {
   const settings: Snapshot['settings'] = {};
@@ -60,10 +61,19 @@ export function normalize(info: Info, asic?: z.infer<typeof asicSchema>): Snapsh
     capabilities: { frequencies: asic?.frequencyOptions ?? [], voltages: asic?.voltageOptions ?? [], writable, poolMode },
   };
 }
-export function validateCapabilities(settings: Settings, snapshot: Snapshot) {
+function validateWritable(settings: Settings, snapshot: Snapshot) {
   if (Object.keys(settings).some(key => !snapshot.capabilities.writable.includes(key as keyof Settings))) throw new AppError('unsupported');
-  if (settings.frequency !== undefined && !snapshot.capabilities.frequencies.includes(settings.frequency)) throw new AppError('unsupportedProfile');
-  if (settings.coreVoltage !== undefined && !snapshot.capabilities.voltages.includes(settings.coreVoltage)) throw new AppError('unsupportedProfile');
+}
+export function validateTuningCapabilities(input: TuningProfile, snapshot: Snapshot) {
+  const profile = profileSchema.parse(input);
+  validateWritable(profile, snapshot);
+  return profile;
+}
+export function validateCapabilities(settings: Settings, snapshot: Snapshot, customValuesAcknowledged = false) {
+  settingsSchema.parse(settings);
+  validateWritable(settings, snapshot);
+  if (!customValuesAcknowledged && settings.frequency !== undefined && !snapshot.capabilities.frequencies.includes(settings.frequency)) throw new AppError('unsupportedProfile');
+  if (!customValuesAcknowledged && settings.coreVoltage !== undefined && !snapshot.capabilities.voltages.includes(settings.coreVoltage)) throw new AppError('unsupportedProfile');
   if (settings.manualFanSpeed !== undefined && (settings.autofanspeed ?? snapshot.settings.autofanspeed) !== 0) throw new AppError('manualFanRequiresManualMode');
 }
 export class AxeAdapter implements MinerAdapter {
@@ -78,8 +88,14 @@ export class AxeAdapter implements MinerAdapter {
     catch { /* Monitoring remains available when optional capabilities cannot be established. */ }
     return { raw, snapshot: normalize(raw, asic) };
   }
-  async patch(address: string, settings: Settings, reading: Reading) {
-    validateCapabilities(settings, reading.snapshot);
+  async patchTuning(address: string, input: TuningProfile, reading: Reading) {
+    // Full operating profiles also restore the saved manual fan percentage while
+    // automatic cooling is active. Never forward pool fields or OC/protection flags.
+    const profile = validateTuningCapabilities(input, reading.snapshot);
+    await this.send(address, '/api/system', 'PATCH', profile);
+  }
+  async patch(address: string, settings: Settings, reading: Reading, customValuesAcknowledged = false) {
+    validateCapabilities(settings, reading.snapshot, customValuesAcknowledged);
     const payload: Record<string, unknown> = { ...settings };
     if (reading.snapshot.capabilities.poolMode === 'slots' && Object.keys(settings).some(key => key.startsWith('stratum'))) {
       const slot = reading.raw.pools!.find(pool => pool.id === (reading.raw.primaryPoolIndex ?? 0))!;

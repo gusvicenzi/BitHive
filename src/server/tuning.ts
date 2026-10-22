@@ -1,8 +1,9 @@
 import { Prisma } from '@prisma/client';
 import type { Snapshot } from '../shared/domain.js';
-import { grid, nextPosition, measurementFailure, profileSchema, rank, summarize, tuningConfigSchema,
+import { grid, nextPosition, measurementFailure, tuningFrequency, tuningTelemetryFailure, profileSchema, rank, summarize, tuningConfigSchema,
   type TuningConfig, type TuningState, type TuningRunView, type TuningSample, type TuningProfile, type WinnerCategory } from '../shared/tuning.js';
 import { AppError } from './errors.js';
+import { validateTuningCapabilities } from './adapter.js';
 import { DeviceLocks } from './concurrency.js';
 import type { FleetService } from './service.js';
 import { attemptView, runView } from './tuning-repository.js';
@@ -38,12 +39,15 @@ export class Tuner {
     return this.lock.run('scheduler', async () => {
       const previous = await this.db.tuningRun.findUnique({ where: { deviceId_requestKey: { deviceId, requestKey } } });
       if (previous) {
-        if (previous.config !== JSON.stringify(config)) throw new AppError('idempotencyConflict', 409);
+        if (JSON.stringify(tuningConfigSchema.parse(JSON.parse(previous.config))) !== JSON.stringify(config)) throw new AppError('idempotencyConflict', 409);
         return runView(previous);
       }
       return this.fleet.withTuningDevice(deviceId, async (device, adapter, reading) => {
-        if (!device.demo || !adapter.patchTuning) throw new AppError('tuningNotValidated');
+        if (!adapter.patchTuning) throw new AppError('tuningNotValidated');
+        if (!device.demo && config.physicalTuningAcknowledged !== true) throw new AppError('physicalTuningAcknowledgementRequired');
+        if (!device.demo && !reading.snapshot.firmware) throw new AppError('missingTelemetry');
         const original = profileSchema.parse(Object.fromEntries(Object.keys(profileSchema.shape).map(k => [k, reading.snapshot.settings[k as keyof TuningProfile]])));
+        if (!device.demo) validateTuningCapabilities(original, reading.snapshot);
         const reason = this.telemetryFailure(reading.snapshot, config);
         if (reason) throw new AppError(reason);
         if (this.safetyFailure(reading.snapshot, config)) throw new AppError('hardwareFault');
@@ -65,10 +69,7 @@ export class Tuner {
     await this.db.tuningRun.update({ where: { id: run.id }, data: { state: JSON.stringify(run.state), ...(release ? { activeSlot: null } : {}) } });
   }
   private telemetryFailure(s: Snapshot, c: TuningConfig) {
-    if ([s.hashRate, s.power, s.temp, s.vrTemp, s.errorRate, s.uptime, s.actualFrequency].some(v => v === undefined || !Number.isFinite(v))) return 'missingTelemetry';
-    if (!(s.actualFrequency! > 0)) return 'missingTelemetry';
-    if (c.expected.source === 'firmware' && !(s.expectedHashrate && s.expectedHashrate > 0)) return 'missingTelemetry';
-    return null;
+    return tuningTelemetryFailure(s, c);
   }
   private safetyFailure(s: Snapshot, c: TuningConfig) {
     if ((s.temp ?? 0) >= c.maxAsicTemperature || (s.vrTemp ?? 0) >= c.maxVrmTemperature) return 'temperature';
@@ -76,8 +77,8 @@ export class Tuner {
     return null;
   }
   private sample(s: Snapshot, c: TuningConfig, at: number): TuningSample {
-    return { at, ths: s.hashRate! / 1000, watts: s.power!, error: s.errorRate!, asic: s.temp!, vrm: s.vrTemp!,
-      expected: c.expected.source === 'firmware' ? s.expectedHashrate! / 1000 : c.expected.ths * s.actualFrequency! / c.expected.frequency,
+    return { at, frequency: tuningFrequency(s, c), frequencySource: c.configuredFrequencyAcknowledged === true ? 'configured' : 'actual', ths: s.hashRate! / 1000, watts: s.power!, error: s.errorRate!, asic: s.temp!, vrm: s.vrTemp!,
+      expected: c.expected.source === 'firmware' ? s.expectedHashrate! / 1000 : c.expected.ths * tuningFrequency(s, c)! / c.expected.frequency,
       accepted: s.accepted, rejected: s.rejected };
   }
   private candidate(run: TuningRunView): TuningProfile {
@@ -179,7 +180,7 @@ export class Tuner {
           await this.db.tuningAttempt.update({ where: { id: s.attemptId! }, data: { auditId: write.auditId } });
           if (write.result !== 'verified') { await this.fail(run, 'uncertainWrite'); return; }
           s.observedProfile = s.profile; s.phase = 'stabilizing'; s.deadline = this.now() + run.config.stabilizationSeconds * 1000;
-        } catch (error) { await this.fail(run, error instanceof AppError && ['externalChange', 'temperature', 'hardwareFault', 'missingTelemetry', 'firmwareChanged', 'reboot'].includes(error.code) ? error.code : 'connectionLoss'); return; }
+        } catch (error) { await this.fail(run, error instanceof AppError && ['externalChange', 'temperature', 'hardwareFault', 'missingTelemetry', 'missingActualFrequency', 'missingConfiguredFrequency', 'firmwareChanged', 'reboot'].includes(error.code) ? error.code : 'connectionLoss'); return; }
       }
       let snapshot: Snapshot;
       try { snapshot = await this.fleet.withTuningDevice(run.deviceId, async (_device, _adapter, reading) => reading.snapshot); }
@@ -193,12 +194,12 @@ export class Tuner {
       if (!Object.entries(s.profile).every(([key, value]) => snapshot.settings[key as keyof TuningProfile] === value)) { await this.fail(run, 'externalChange'); return; }
       if (s.lastObserved !== null && this.now() - s.lastObserved > 10000) { await this.fail(run, 'monitoringGap'); return; }
       s.uptime = snapshot.uptime!; s.lastObserved = this.now();
-      if ((s.phase === 'measuring' || s.phase === 'confirming') && Math.abs(snapshot.actualFrequency! - s.profile.frequency) > 1) { await this.fail(run, 'frequencyMismatch'); return; }
+      if ((s.phase === 'measuring' || s.phase === 'confirming') && Math.abs(tuningFrequency(snapshot, run.config)! - s.profile.frequency) > 1) { await this.fail(run, 'frequencyMismatch'); return; }
       const point = this.sample(snapshot, run.config, this.now()); s.live = point;
       const stabilization = s.phase === 'baseline' || s.phase === 'stabilizing';
-      if (stabilization && this.now() >= s.deadline!) {
+      if (stabilization && point.at >= s.deadline!) {
         s.phase = s.kind === 'confirmation' ? 'confirming' : 'measuring';
-        s.measurementStart = this.now(); s.deadline = this.now() + run.config.measurementSeconds * (s.kind === 'confirmation' ? 3 : 1) * 1000;
+        s.measurementStart = point.at; s.deadline = point.at + run.config.measurementSeconds * (s.kind === 'confirmation' ? 3 : 1) * 1000;
       }
       const measuring = s.phase === 'measuring' || s.phase === 'confirming';
       if (measuring) {
@@ -210,7 +211,7 @@ export class Tuner {
       if (measuring) {
         s.streak = point.error > run.config.maxErrorPercentage ? s.streak + 1 : 0;
         if (s.streak >= 3 && point.at <= s.deadline!) { await this.fail(run, 'hashError', false); return; }
-        if (this.now() >= s.deadline!) {
+        if (point.at >= s.deadline!) {
           const rows = await this.db.tuningSample.findMany({ where: { attemptId: s.attemptId!, phase: 'measuring' } });
           const summary = summarize(rows.map(row => JSON.parse(row.data)), s.measurementStart!, s.deadline!, run.config.expected.source);
           const reason = measurementFailure(summary, run.config);

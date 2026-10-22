@@ -25,8 +25,8 @@ export class DemoAdapter implements MinerAdapter {
   async patchTuning(address: string, settings: Settings, reading: Reading) {
     this.state.set(address, { ...reading.snapshot.settings, ...settings });
   }
-  async patch(address: string, settings: Settings, reading: Reading) {
-    validateCapabilities(settings, reading.snapshot);
+  async patch(address: string, settings: Settings, reading: Reading, customValuesAcknowledged = false) {
+    validateCapabilities(settings, reading.snapshot, customValuesAcknowledged);
     this.state.set(address, { ...reading.snapshot.settings, ...settings, stratumPassword: undefined });
   }
 }

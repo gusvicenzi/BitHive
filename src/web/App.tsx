@@ -66,8 +66,8 @@ export function App() {
     event.preventDefault();
     void mutation(async () => { await api('/devices', { address, ...(name.trim() ? { name } : {}) }); setAdding(false); setAddress(''); setName(''); });
   }
-  const batch = (ids: string[], settings?: Settings) => void mutation(async () => {
-    setResults(await api<ActionResult[]>('/batch', { ids, action: settings ? 'configure' : 'refresh', ...(settings ? { settings } : {}) }));
+  const batch = (ids: string[], settings?: Settings, customValuesAcknowledged = false) => void mutation(async () => {
+    setResults(await api<ActionResult[]>('/batch', { ids, action: settings ? 'configure' : 'refresh', ...(settings ? { settings, ...(customValuesAcknowledged ? { customValuesAcknowledged: true } : {}) } : {}) }));
   });
   const detail = devices.find(d => d.id === detailId);
   const totals = aggregate(devices.filter(d => !d.demo));
@@ -76,7 +76,10 @@ export function App() {
     : totals.efficiency;
   const demoTotals = aggregate(devices.filter(d => d.demo));
   const shown = devices.filter(d => filter === 'all' || d.status === filter);
-  const showDetail = (device: DeviceView) => { setHistory(null); setDetailId(device.id); };
+  const showDetail = (device: DeviceView) => {
+    if (device.id === detailId) return;
+    setHistory(null); setDetailId(device.id);
+  };
   return <div className="app-shell">
     <aside className="sidebar"><a href="#fleet" className="brand"><svg aria-hidden="true" viewBox="0 0 40 44"><path d="M20 2 37 12v20L20 42 3 32V12Z" fill="currentColor"/><path d="M13 13h9c8 0 9 8 3 10 7 3 4 10-3 10h-9Zm5 5v4h4c3 0 3-4 0-4Zm0 8v3h4c3 0 3-3 0-3Z" fill="#123c50"/></svg>BitHive</a>
       <p className="sidebar-caption">{t('localFleet')}</p><nav aria-label={t('navigation')}><a className="nav-active" href="#fleet"><span aria-hidden="true">▦</span>{t('fleet')}</a><a href="#activity"><span aria-hidden="true">≋</span>{t('activity')}</a></nav>
@@ -110,7 +113,7 @@ export function App() {
       <div className="section-title"><h3>{t('history')}</h3><label>{t('timeRange')}<select value={hours} onChange={event => { setHours(Number(event.target.value)); setHistory(null); }}><option value="1">{t('oneHour')}</option><option value="24">{t('oneDay')}</option><option value="168">{t('oneWeek')}</option></select></label></div>
       {historyError ? <p role="alert">{t(`errors.${historyError}`, { defaultValue: t('errors.operationFailed') })}</p> : !history ? <p role="status">{t('loading')}</p> : <><div className="charts"><Chart metrics={history.metrics} field="hashRate" unit="GH/s" label={t('hashrate')} /><Chart metrics={history.metrics} field="power" unit="W" label={t('power')} /><Chart metrics={history.metrics} field="temp" unit="°C" label={t('temperature')} /></div><p className="muted">{t('historyLimit', { count: history.limit })}</p></>}
       <DeviceNaming key={`names-${detail.id}`} device={detail} busy={busy} onUpdated={() => reload()} />
-      <Configuration key={detail.id} device={detail} count={selected.includes(detail.id) ? selected.length : 1} busy={busy} onApply={settings => batch(selected.includes(detail.id) ? selected : [detail.id], settings)} />
+      <Configuration key={detail.id} device={detail} count={selected.includes(detail.id) ? selected.length : 1} busy={busy} onApply={(settings, acknowledged) => batch(selected.includes(detail.id) ? selected : [detail.id], settings, acknowledged)} />
       <Tuning key={`tuning-${detail.id}`} device={detail} />
       <div className="audit-grid"><div><h3>{t('deviceEvents')}</h3>{history?.events.length ? history.events.map(event => <p key={event.id}><time>{date(event.timestamp)}</time> {t(`events.${event.kind}`, { defaultValue: t('events.observed') })}</p>) : <p className="muted">{t('noEvents')}</p>}</div><div><h3>{t('configurationHistory')}</h3>{history?.changes.length ? history.changes.map(change => <details key={change.id}><summary>{date(change.timestamp)} · {t(`results.${change.result}`, { defaultValue: t('results.observed') })}</summary><dl>{Object.entries(JSON.parse(change.result === 'observed' ? change.after ?? '{}' : change.requested)).map(([key, value]) => <div key={key}><dt>{t(key)}</dt><dd>{typeof value === 'number' ? number(value) : typeof value === 'boolean' ? t('changed') : String(value)}</dd></div>)}</dl></details>) : <p className="muted">{t('noChanges')}</p>}</div></div>
     </section>}

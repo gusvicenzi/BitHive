@@ -93,3 +93,46 @@ test('live operating window, labeled readings and countdown fit desktop and mobi
   await portuguese.screenshot({ path: 'test-results/bithive-tuner-console-mobile.png' });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });
+
+test('physical acknowledgement UI gates each run with a demo-backed fixture', async ({ page, request }) => {
+  // The browser sees a physical device; all server writes remain on a demo miner.
+  await request.post('/api/demo', { headers: { 'X-BitHive': '1' } });
+  const devices = await (await request.get('/api/devices')).json();
+  const device = devices.find((d: { name: string }) => d.name === 'Bitaxe 3');
+  await page.route('**/api/devices', route => route.fulfill({ json: [{ ...device, demo: false, snapshot: { ...device.snapshot, actualFrequency: undefined } }] }));
+  await page.route(`**/api/devices/${device.id}/tuning`, route => {
+    if (route.request().method() === 'POST' && !route.request().postDataJSON().config.configuredFrequencyAcknowledged) return route.fulfill({ status: 400, json: { error: 'missingActualFrequency' } });
+    return route.continue();
+  });
+  await page.goto('/'); await page.getByRole('button', { name: 'Bitaxe 3', exact: true }).click();
+  const tuning = page.getByRole('region', { name: 'Automatic tuning', exact: true });
+  const toggle = tuning.getByRole('switch', { name: /I understand the risks/ });
+  const start = tuning.getByRole('button', { name: 'Start tuning' });
+  await expect(toggle).not.toBeChecked(); await expect(start).toBeDisabled();
+  await expect(tuning.getByLabel('Minimum frequency (MHz)', { exact: true })).toBeDisabled();
+  await toggle.focus(); await page.keyboard.press('Space');
+  await expect(start).toBeEnabled();
+  await tuning.getByLabel('Minimum frequency (MHz)', { exact: true }).fill('525');
+  await tuning.getByLabel('Maximum frequency (MHz)', { exact: true }).fill('525');
+  await tuning.getByLabel('Minimum voltage (mV)', { exact: true }).fill('1150');
+  await tuning.getByLabel('Maximum voltage (mV)', { exact: true }).fill('1150');
+  await tuning.screenshot({ path: 'test-results/bithive-physical-tuning-acknowledgement.png' });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await tuning.screenshot({ path: 'test-results/bithive-physical-tuning-acknowledgement-mobile.png' });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await start.click();
+  await expect(tuning.getByRole('alert')).toContainText('actualFrequency');
+  await tuning.getByRole('button', { name: /I acknowledge this limitation/ }).click();
+  await expect(tuning.getByText(/Frequency source: configured setting/)).toBeVisible();
+  await tuning.screenshot({ path: 'test-results/bithive-configured-frequency-acknowledgement.png' });
+  const started = page.waitForRequest(req => req.url().endsWith(`/devices/${device.id}/tuning`) && req.method() === 'POST');
+  await start.click();
+  expect((await started).postDataJSON().config).toMatchObject({ physicalTuningAcknowledged: true, configuredFrequencyAcknowledged: true });
+  await expect(tuning.getByRole('heading', { name: 'Baseline observation', exact: true })).toBeVisible();
+  await tuning.getByRole('button', { name: 'Stop', exact: true }).click();
+  await expect(tuning.getByRole('heading', { name: 'Stopped', exact: true })).toBeVisible();
+  await tuning.locator('.tuning-setup > summary').click();
+  await expect(toggle).not.toBeChecked(); await expect(start).toBeDisabled();
+  await page.getByLabel('Language').selectOption('pt-BR');
+  await expect(page.getByRole('region', { name: 'Ajuste automático', exact: true }).getByRole('switch', { name: /Entendo os riscos e autorizo/ })).toBeVisible();
+});

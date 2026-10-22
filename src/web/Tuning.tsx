@@ -29,6 +29,9 @@ export function Tuning({ device }: { device: DeviceView }) {
   const [offset, setOffset] = useState(0), [busy, setBusy] = useState(false), [error, setError] = useState('');
   const [clock, setClock] = useState(Date.now());
   const requestKey = useRef<string | null>(null);
+  const [physicalAcknowledged, setPhysicalAcknowledged] = useState(false);
+  const [configuredFrequencyAcknowledged, setConfiguredFrequencyAcknowledged] = useState(false);
+  useEffect(() => { setPhysicalAcknowledged(false); setConfiguredFrequencyAcknowledged(false); requestKey.current = null; }, [device.id]);
   const run = runs.find(r => r.id === selected) ?? runs[0];
   const active = !!run && !['completed', 'stopped', 'failed'].includes(run.state.phase);
   const config = tuningConfigSchema.safeParse({
@@ -36,6 +39,8 @@ export function Tuning({ device }: { device: DeviceView }) {
     voltage: { minimum: Number(values.voltageMin), maximum: Number(values.voltageMax), step: Number(values.voltageStep) },
     ...Object.fromEntries(fields.slice(6).map(key => [key, values[key].trim() ? Number(values[key]) : undefined])), mode,
     fan: fanMode === 'automatic' ? { mode: 'automatic' } : { mode: 'fixed', percentage: fan.trim() ? Number(fan) : undefined },
+    ...(!device.demo ? { physicalTuningAcknowledged: physicalAcknowledged } : {}),
+    ...(configuredFrequencyAcknowledged ? { configuredFrequencyAcknowledged: true } : {}),
     expected: source === 'firmware' ? { source } : { source, ths: Number(reference), frequency: Number(referenceFrequency) },
   });
   const range = config.success ? preview(config.data) : null;
@@ -70,11 +75,12 @@ export function Tuning({ device }: { device: DeviceView }) {
   }
   function start(event: FormEvent) {
     event.preventDefault();
+    if (!device.demo && !physicalAcknowledged) { setError('physicalTuningAcknowledgementRequired'); return; }
     if (!config.success) { setError('invalidInput'); return; }
     requestKey.current ??= crypto.randomUUID();
     void action(async () => {
       const created = await api<TuningRunView>(`/devices/${device.id}/tuning`, { requestKey: requestKey.current, config: config.data });
-      setSelected(created.id); setOffset(0); requestKey.current = null;
+      setSelected(created.id); setOffset(0); requestKey.current = null; setPhysicalAcknowledged(false); setConfiguredFrequencyAcknowledged(false);
     });
   }
   function control(control: 'pause' | 'resume' | 'stop') { if (run) void action(() => api(`/devices/${device.id}/tuning/${run.id}/${control}`, {})); }
@@ -95,10 +101,18 @@ export function Tuning({ device }: { device: DeviceView }) {
   return <section className="tuning" aria-label={t('automaticTuning')}>
     <div className="tuning-header"><div><p className="eyebrow">{t('tuner.design.eyebrow')}</p><h3>{t('automaticTuning')}</h3></div><span className="tuning-scope"><span aria-hidden="true">⬡</span>{t('tuner.oneMiner')}</span></div>
     <p className="tuning-host-hint">{t('tuner.hostRequired')}</p>
-    {!device.demo && <p className="notice">{t('tuner.physicalGate')}</p>}
     {error && <p role="alert">{t(`errors.${error}`, { defaultValue: t(`tuner.reasons.${error}`, { defaultValue: t('errors.operationFailed') }) })}</p>}
+    {error === 'missingActualFrequency' && !configuredFrequencyAcknowledged && <div className="notice">
+      <p>{t('tuner.configuredFrequencyWarning')}</p>
+      <button type="button" disabled={busy || active} onClick={() => { setConfiguredFrequencyAcknowledged(true); requestKey.current = null; setError(''); }}>{t('tuner.acknowledgeConfiguredFrequency')}</button>
+    </div>}
+    {(configuredFrequencyAcknowledged || run?.config.configuredFrequencyAcknowledged) && <p className="notice">{t('tuner.configuredFrequencyActive')}</p>}
     <details className="tuning-setup" open={!run}><summary><span>{t('tuner.setup')}<small>{t('tuner.design.setupHint')}</small></span><span className="tuning-disclosure" aria-hidden="true">+</span></summary><form onSubmit={start}>
-      <fieldset className="tuning-form-fields" disabled={busy || active || !device.demo}><legend className="sr-only">{t('tuner.bounds')}</legend>
+      {!device.demo && <div className="custom-values-control tuning-acknowledgement">
+        <label className="custom-values-switch"><input type="checkbox" role="switch" disabled={busy || active || device.status !== 'online'} checked={physicalAcknowledged} onChange={event => { setPhysicalAcknowledged(event.target.checked); requestKey.current = null; }} aria-describedby={`physical-tuning-${device.id}`} />{t('tuner.physicalAcknowledgement')}</label>
+        <p id={`physical-tuning-${device.id}`} className="muted">{t('tuner.physicalGate')}</p>
+      </div>}
+      <fieldset className="tuning-form-fields" disabled={busy || active || (!device.demo && (!physicalAcknowledged || device.status !== 'online'))}><legend className="sr-only">{t('tuner.bounds')}</legend>
         <fieldset className="tuning-field-group"><legend>{t('tuner.design.groups.window')}</legend><p>{t('tuner.design.rangeHint')}</p><div className="tuning-range-fields">{fields.slice(0, 6).map(input)}</div></fieldset>
         <fieldset className="tuning-field-group"><legend>{t('tuner.design.groups.limits')}</legend><div className="tuning-limit-fields">{fields.slice(6, 10).map(input)}</div></fieldset>
         <fieldset className="tuning-field-group"><legend>{t('tuner.design.groups.observation')}</legend><div className="form-grid">{fields.slice(10).map(input)}
@@ -109,7 +123,7 @@ export function Tuning({ device }: { device: DeviceView }) {
         {source === 'reference' && <><label>{t('tuner.referenceThs')}<input required type="number" min="0.001" step="any" value={reference} onChange={e => setReference(e.target.value)} /></label><label>{t('tuner.referenceFrequency')}<input required type="number" min="1" step="1" value={referenceFrequency} onChange={e => setReferenceFrequency(e.target.value)} /></label></>}
       </div></fieldset></fieldset>
       {range && <p className="notice" role="status">{t('tuner.preview', { fmin: range.frequencies[0], fmax: range.frequencies.at(-1), vmin: range.voltages[0], vmax: range.voltages.at(-1), count: range.count, minutes: number(Math.ceil(range.seconds / 60), 0) })}</p>}
-      <div className="tuning-start-row"><button className="primary" disabled={busy || active || !device.demo || !config.success}>{t('tuner.start')}<span aria-hidden="true"> →</span></button></div>
+      <div className="tuning-start-row"><button className="primary" disabled={busy || active || (!device.demo && (!physicalAcknowledged || device.status !== 'online')) || !config.success}>{t('tuner.start')}<span aria-hidden="true"> →</span></button></div>
     </form></details>
     {!!runs.length && <label className="tuning-run-picker">{t('tuner.runs')}<select value={run?.id ?? ''} onChange={e => { setSelected(e.target.value); setOffset(0); }}>{runs.map(r => <option key={r.id} value={r.id}>{new Date(r.createdAt).toLocaleString(i18n.language)} · {t(`tuner.phases.${r.state.phase}`)}</option>)}</select></label>}
     {run && <><TuningProgress run={run} clock={clock} busy={busy} active={active} onControl={control} />

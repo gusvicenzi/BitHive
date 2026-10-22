@@ -47,6 +47,33 @@ describe('AxeOS adapter', () => {
     await adapter.patch('bitaxe.local', { frequency: 550, stratumUser: 'example.other' }, reading);
     expect(send).toHaveBeenLastCalledWith('bitaxe.local', '/api/system', 'PATCH', { frequency: 550, stratumUser: 'example.other' });
   });
+  it('requires acknowledgement for custom writes and never forwards it to AxeOS', async () => {
+    const send = vi.fn(async (_host: string, path: string) => path.endsWith('/asic') ? asic : info);
+    const adapter = new AxeAdapter(send); const reading = await adapter.read('bitaxe.local');
+    await expect(adapter.patch('bitaxe.local', { frequency: 537, coreVoltage: 1160 }, reading)).rejects.toThrow('unsupportedProfile');
+    expect(send).toHaveBeenCalledTimes(2);
+    await adapter.patch('bitaxe.local', { frequency: 537, coreVoltage: 1160 }, reading, true);
+    expect(send).toHaveBeenLastCalledWith('bitaxe.local', '/api/system', 'PATCH', { frequency: 537, coreVoltage: 1160 });
+    const unsupported = { ...reading, snapshot: { ...reading.snapshot, capabilities: { ...reading.snapshot.capabilities, writable: [] } } };
+    await expect(adapter.patch('bitaxe.local', { frequency: 537 }, unsupported, true)).rejects.toThrow('unsupported');
+    await expect(adapter.patch('bitaxe.local', { manualFanSpeed: 40 }, reading, true)).rejects.toThrow('manualFanRequiresManualMode');
+    for (const value of [0, -1, 1.5, 65536, Infinity]) {
+      await expect(adapter.patch('bitaxe.local', { frequency: value }, reading, true)).rejects.toThrow();
+      await expect(adapter.patch('bitaxe.local', { coreVoltage: value }, reading, true)).rejects.toThrow();
+    }
+    expect(send).toHaveBeenCalledTimes(3);
+  });
+  it('writes only a validated full tuning profile, including restoring the automatic fan mode', async () => {
+    const send = vi.fn(async (_host: string, path: string) => path.endsWith('/asic') ? asic : info);
+    const adapter = new AxeAdapter(send); const reading = await adapter.read('bitaxe.local');
+    const profile = { frequency: 537, coreVoltage: 1160, autofanspeed: 1 as const, manualFanSpeed: 60 };
+    await adapter.patchTuning('bitaxe.local', profile, reading);
+    expect(send).toHaveBeenLastCalledWith('bitaxe.local', '/api/system', 'PATCH', profile);
+    await expect(adapter.patchTuning('bitaxe.local', { ...profile, overheat_mode: 0 } as typeof profile, reading)).rejects.toThrow();
+    const unsupported = { ...reading, snapshot: { ...reading.snapshot, capabilities: { ...reading.snapshot.capabilities, writable: ['frequency', 'coreVoltage'] as ('frequency' | 'coreVoltage')[] } } };
+    await expect(adapter.patchTuning('bitaxe.local', profile, unsupported)).rejects.toThrow('unsupported');
+    expect(send).toHaveBeenCalledTimes(3);
+  });
   it('preserves active slot settings and uses the firmware password-preservation marker', async () => {
     const slots = { ...info, primaryPoolIndex: 2, pools: [{ id: 2, stratumURL: 'pool.example.com', stratumPort: 3333, stratumUser: 'example.worker', stratumTLS: 2, stratumProtocol: 'SV1', stratumSuggestedDifficulty: 1000 }] };
     const send = vi.fn(async (_host: string, path: string) => path.endsWith('/asic') ? asic : slots);

@@ -67,6 +67,14 @@ describe('persistent tuning lifecycle', () => {
     const audits = await fixture.db.tuningCheckpoint.findMany({ where: { purpose: 'search' } });
     expect(audits.every(a => a.auditId !== null && a.status === 'verified')).toBe(true);
   });
+  it('keeps measurement samples aligned when the clock advances within a polling tick', async () => {
+    tuner = new Tuner(fleet, () => now++);
+    const run = await until(await create(), r => r.state.phase === 'completed');
+    const results = await tuner.results(deviceId, run.id);
+    expect(results.attempts.every(attempt => attempt.outcome === 'passed')).toBe(true);
+    expect(results.attempts.some(attempt => attempt.kind === 'confirmation')).toBe(true);
+    expect(run.state.winners.hashrate).not.toBeNull();
+  });
   it('pauses with verified original restoration and resumes the same interrupted candidate', async () => {
     let run = await until(await create(), inSearch); const profile = run.state.profile;
     run = await tuner.control(deviceId, run.id, 'pause');
@@ -157,7 +165,7 @@ describe('candidate failures and recovery', () => {
   });
   it('invalidates missing telemetry, monitoring gaps and share-counter resets', async () => {
     let run = await until(await create(), inSearch); modify = s => { s.actualFrequency = undefined; };
-    run = await step(run); expect(run.state.reason).toBe('missingTelemetry');
+    run = await step(run); expect(run.state.reason).toBe('missingActualFrequency');
     modify = () => {}; run = await until(run, inSearch); now += 20000; run = await step(run); expect(run.state.reason).toBe('monitoringGap');
     await tuner.control(deviceId, run.id, 'stop');
     run = await tuner.create(deviceId, 'second', config); run = await until(run, inSearch);
@@ -230,9 +238,9 @@ describe('tuning API and physical capability boundary', () => {
     expect((await app.inject({ url: `${base}/${run.id}/results?limit=1`, headers })).json()).toMatchObject({ total: 0, limit: 1 });
     await app.close();
   });
-  it('cannot enable physical custom writes by claiming compatible firmware or adapter support', async () => {
+  it('requires acknowledgement even when a physical adapter supports tuning', async () => {
     const physical = await new FleetService(fixture.db, adapter).register('192.168.1.42');
     const physicalTuner = new Tuner(new FleetService(fixture.db, adapter), () => now);
-    await expect(physicalTuner.create(physical.id, 'physical', config)).rejects.toThrow('tuningNotValidated');
+    await expect(physicalTuner.create(physical.id, 'physical', config)).rejects.toThrow('physicalTuningAcknowledgementRequired');
   });
 });

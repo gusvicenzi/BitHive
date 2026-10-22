@@ -13,6 +13,63 @@ const snapshot: Snapshot = { settings: { frequency: 825, coreVoltage: 1180 }, ex
 const device: DeviceView = { id: 'demo', name: 'Demo', address: 'demo-1', demo: true, status: 'online', lastSeen: null, snapshot };
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); void i18n.changeLanguage('en'); });
 const mockApi = () => vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => [] })));
+describe('configured frequency acknowledgement', () => {
+  it('offers the acknowledgement only after the specific missing-frequency error, then sends an explicit per-run choice', async () => {
+    let posts = 0;
+    const fetch = vi.fn(async (_url: string, options?: RequestInit) => {
+      if (options?.method !== 'POST') return { ok: true, json: async () => [] };
+      posts++; return posts === 1 ? { ok: false, json: async () => ({ error: 'missingActualFrequency' }) } : { ok: true, json: async () => ({ id: 'run' }) };
+    });
+    vi.stubGlobal('fetch', fetch);
+    render(<Tuning device={{ ...device, demo: false }} />);
+    expect(screen.queryByRole('button', { name: /I acknowledge this limitation/ })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('switch'));
+    await userEvent.click(screen.getByRole('button', { name: 'Start tuning' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('actualFrequency');
+    await userEvent.click(await screen.findByRole('button', { name: /I acknowledge this limitation/ }));
+    expect(screen.getByText(/Frequency source: configured setting/)).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Start tuning' }));
+    await waitFor(() => expect(posts).toBe(2));
+    const requests = fetch.mock.calls.filter(([, options]) => options?.method === 'POST').map(([, options]) => JSON.parse(options!.body as string));
+    expect(requests[0].config).not.toHaveProperty('configuredFrequencyAcknowledged');
+    expect(requests[1].config.configuredFrequencyAcknowledged).toBe(true);
+    expect(requests[1].requestKey).not.toBe(requests[0].requestKey);
+  });
+  it('does not offer a bypass for other missing telemetry', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (_url: string, options?: RequestInit) => options?.method === 'POST' ? { ok: false, json: async () => ({ error: 'missingTelemetry' }) } : { ok: true, json: async () => [] }));
+    render(<Tuning device={device} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Start tuning' }));
+    await screen.findByRole('alert');
+    expect(screen.queryByRole('button', { name: /I acknowledge this limitation/ })).not.toBeInTheDocument();
+  });
+});
+describe('physical tuning acknowledgement', () => {
+  it('requires acknowledgement for each physical run and includes it in the start request', async () => {
+    const fetch = vi.fn(async (_url: string, options?: RequestInit) => ({ ok: true, json: async () => options?.method === 'POST' ? { id: 'run' } : [] }));
+    vi.stubGlobal('fetch', fetch);
+    render(<Tuning device={{ ...device, demo: false }} />);
+    const start = screen.getByRole('button', { name: 'Start tuning' });
+    const toggle = screen.getByRole('switch');
+    expect(toggle).not.toBeChecked(); expect(start).toBeDisabled();
+    expect(screen.getByLabelText('Minimum frequency (MHz)')).toBeDisabled();
+    await userEvent.click(toggle); expect(start).toBeEnabled();
+    expect(screen.getByLabelText('Minimum frequency (MHz)')).toBeEnabled();
+    await userEvent.click(start);
+    await waitFor(() => expect(fetch.mock.calls.some(([, options]) => options?.method === 'POST')).toBe(true));
+    const request = fetch.mock.calls.find(([, options]) => options?.method === 'POST')![1]!;
+    expect(JSON.parse(request.body as string).config.physicalTuningAcknowledged).toBe(true);
+    await waitFor(() => expect(toggle).not.toBeChecked()); expect(start).toBeDisabled();
+  });
+  it('keeps offline physical miners locked and never requires hardware acknowledgement in demo mode', () => {
+    mockApi(); const { rerender } = render(<Tuning device={{ ...device, demo: false, status: 'offline' }} />);
+    expect(screen.getByRole('switch')).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Start tuning' })).toBeDisabled();
+    rerender(<Tuning device={device} />);
+    expect(screen.queryByRole('switch')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Start tuning' })).toBeEnabled();
+  });
+});
 describe('tuning setup prefills', () => {
   it('uses extrema of unsorted AxeOS options, excluding custom current settings', () => {
     expect(tuningDefaults(snapshot)).toMatchObject({ frequencyMin: '400', frequencyMax: '625', voltageMin: '1000', voltageMax: '1200',

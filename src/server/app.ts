@@ -56,7 +56,7 @@ export async function createApp(db: PrismaClient, options: { service?: FleetServ
   app.post('/api/devices/:id/profiles', async req => {
     const { id } = z.object({ id: z.string().min(1).max(64) }).parse(req.params);
     const body = z.object({ name: z.string().trim().min(1).max(80), settings: z.object({
-      frequency: z.number().int().positive().optional(), coreVoltage: z.number().int().positive().optional(),
+      frequency: z.number().int().min(1).max(65535).optional(), coreVoltage: z.number().int().min(1).max(65535).optional(),
       autofanspeed: z.union([z.literal(0), z.literal(1)]).optional(), manualFanSpeed: z.number().int().min(0).max(100).optional(),
     }).strict().refine(s => Object.keys(s).length > 0) }).strict().parse(req.body);
     if (!await db.device.findUnique({ where: { id } })) throw new AppError('notFound', 404);
@@ -68,10 +68,10 @@ export async function createApp(db: PrismaClient, options: { service?: FleetServ
   });
   app.post('/api/batch', req => {
     const body = z.object({ ids: z.array(z.string().min(1).max(64)).min(1).max(50).refine(ids => new Set(ids).size === ids.length),
-      action: z.enum(['refresh', 'configure']), settings: settingsSchema.optional() }).strict()
+      action: z.enum(['refresh', 'configure']), settings: settingsSchema.optional(), customValuesAcknowledged: z.boolean().optional() }).strict()
       .refine(v => v.action !== 'configure' || v.settings !== undefined)
       .refine(v => v.settings?.hostname === undefined || v.ids.length === 1).parse(req.body);
-    return service.batch(body.ids, body.action, body.settings);
+    return service.batch(body.ids, body.action, body.settings, body.customValuesAcknowledged);
   });
   app.get('/api/devices/:id/history', async req => {
     const { id } = z.object({ id: z.string().min(1).max(64) }).parse(req.params);

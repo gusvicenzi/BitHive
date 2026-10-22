@@ -91,7 +91,7 @@
   "manualControl": "CONTROLE MANUAL",
   "configuration": "Configuração do minerador",
   "targetCount": "{{count}} destino(s)",
-  "configureHint": "Deixe um campo vazio para manter o valor atual. Apenas opções informadas pelo aparelho ficam disponíveis.",
+  "configureHint": "Deixe um campo vazio para manter o valor atual. Use as opções do aparelho ou confirme os riscos para inserir frequência e tensão personalizadas.",
   "batchHint": "As opções vêm deste minerador. Cada selecionado é verificado separadamente; configurações incompatíveis são rejeitadas para aquele aparelho.",
   "operatingProfile": "Perfil de operação",
   "frequency": "Frequência (MHz)",
@@ -117,6 +117,7 @@
   "chooseProfile": "Escolha um perfil",
   "profileName": "Nome do perfil",
   "saveProfile": "Salvar campos de operação",
+  "saveProfileHint": "Informe um nome para salvar as configurações de operação atuais, incluindo alterações pendentes. Salvar um perfil não aplica configurações ao minerador.",
   "automaticTuning": "Ajuste automático",
   "errors": {
     "invalidInput": "Verifique os valores informados e tente novamente.",
@@ -135,13 +136,16 @@
     "profileLimit": "Este minerador já tem 20 perfis salvos.",
     "operationFailed": "A operação falhou. Verifique o servidor e a rede e tente novamente.",
     "tuningOwnsDevice": "O ajuste ou a recuperação controla este minerador. Pare o ajuste e confirme a restauração antes de alterar configurações.",
-    "tuningNotValidated": "O ajuste físico não foi validado para este firmware.",
+    "tuningNotValidated": "O adaptador deste aparelho não oferece ajuste automático.",
     "tuningAlreadyActive": "Outro ajuste ocupa a vaga de ajuste.",
     "idempotencyConflict": "Este identificador de solicitação já foi usado com outras configurações.",
     "tuningNotActive": "Este ajuste não permite essa ação.",
     "tuningCannotResume": "Este ajuste só pode retomar após confirmação da restauração e resolução das falhas de segurança.",
     "noConfirmedWinner": "Nenhum vencedor confirmado disponível.",
-    "unsafeRecovery": "A recuperação aumentaria a tensão após uma parada de segurança."
+    "unsafeRecovery": "A recuperação aumentaria a tensão após uma parada de segurança.",
+    "physicalTuningAcknowledgementRequired": "Confirme os riscos antes de iniciar o ajuste automático neste minerador físico.",
+    "missingActualFrequency": "Este firmware não informa uma actualFrequency válida. Você pode confirmar o uso da frequência configurada nesta execução.",
+    "missingConfiguredFrequency": "A frequência configurada está ausente ou é inválida. O ajuste não pode continuar."
   },
   "results": {
     "verified": "Verificado",
@@ -199,7 +203,7 @@
   "tuner": {
     "oneMiner": "Um minerador por vez",
     "hostRequired": "O ajuste continua ao fechar o navegador. Mantenha o servidor BitHive ligado e conectado; um computador em suspensão ou inacessível não pode restaurar mineradores.",
-    "physicalGate": "O ajuste físico está desativado: gravação, aplicação em funcionamento, leitura de confirmação e restauração exigem validação independente do aparelho e firmware. A validação de monitoramento do Starminer não é suficiente.",
+    "physicalGate": "O ajuste automático altera frequência, tensão e ventoinha e pode causar instabilidade, superaquecimento ou danos ao hardware. Confirme que as alterações manuais funcionam neste firmware e revise todos os limites. O BitHive tentará restaurar os valores originais ao pausar, parar ou concluir; isso exige servidor em execução e minerador acessível. A confirmação vale para esta execução, inclusive a recuperação após reiniciar o servidor.",
     "setup": "Configurar um ajuste",
     "bounds": "Faixas de operação e limites explícitos",
     "mode": "Modo de busca",
@@ -313,7 +317,9 @@
       "candidateFailed": "Candidato reprovado",
       "applyWinner": "Aplicação explícita do vencedor",
       "winnerApplyFailed": "Falha ao aplicar o vencedor",
-      "counterReset": "Reinício dos contadores de shares invalidou a medição"
+      "counterReset": "Reinício dos contadores de shares invalidou a medição",
+      "missingActualFrequency": "Este firmware não informa uma actualFrequency válida. Você pode confirmar o uso da frequência configurada nesta execução.",
+      "missingConfiguredFrequency": "A frequência configurada está ausente ou é inválida. O ajuste não pode continuar."
     },
     "design": {
       "eyebrow": "Frequência × tensão",
@@ -354,6 +360,16 @@
       "rangeHint": "A frequência aumenta em cada faixa de tensão. Os limites começam na faixa de presets do AxeOS.",
       "resultScroll": "Resultados do ajuste; role na horizontal para ver todas as medições",
       "runningOnServer": "Executando no servidor"
-    }
-  }
+    },
+    "physicalAcknowledgement": "Entendo os riscos e autorizo o ajuste automático neste minerador",
+    "configuredFrequencyWarning": "A frequência configurada é o valor definido no firmware, não uma confirmação independente do clock aplicado ao ASIC. Usá-la impede detectar rampas ou redução de clock pela actualFrequency. Temperatura, hashrate, erros e leitura de confirmação continuam obrigatórios. A escolha vale para toda a execução, incluindo retomada e recuperação.",
+    "acknowledgeConfiguredFrequency": "Entendo essa limitação — usar frequência configurada nesta execução",
+    "configuredFrequencyActive": "Origem da frequência: valor configurado (confirmado). O clock aplicado ao ASIC não é verificado de forma independente."
+  },
+  "customValuesAcknowledgement": "Entendo os riscos e quero inserir valores personalizados de frequência e tensão",
+  "customValuesHint": "Valores personalizados podem causar instabilidade, superaquecimento ou danos ao hardware. Confira os limites do minerador e da fonte. Esta confirmação libera apenas os campos manuais no BitHive; não ativa o modo OC do AxeOS nem o ajuste automático.",
+  "customValueRequiresAcknowledgement": "{{value}} (personalizado · confirmação necessária)",
+  "customValuesAcknowledged": "Valores personalizados confirmados",
+  "physicalTuningAcknowledged": "Ajuste físico confirmado",
+  "configuredFrequencyAcknowledged": "Frequência configurada confirmada"
 }

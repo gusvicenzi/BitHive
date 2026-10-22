@@ -19,6 +19,22 @@ beforeEach(async () => { await fixture.db.device.deleteMany(); });
 afterAll(async () => { await app?.close(); await fixture?.close(); });
 async function miner() { return service.register('192.168.1.42', 'Test Gamma'); }
 
+describe('custom manual settings', () => {
+  it('enforces request acknowledgement, verifies custom writes and records acknowledgement separately', async () => {
+    const device = await miner();
+    const payload = { ids: [device.id], action: 'configure', settings: { frequency: 537, coreVoltage: 1160 } };
+    expect((await post('/api/batch', payload)).json()[0]).toMatchObject({ result: 'rejected', reason: 'unsupportedProfile' });
+    expect(await fixture.db.configChange.count({ where: { deviceId: device.id } })).toBe(0);
+    expect((await post('/api/batch', { ...payload, customValuesAcknowledged: 'true' })).statusCode).toBe(400);
+    expect((await post('/api/batch', { ...payload, customValuesAcknowledged: true, settings: { frequency: 65536 } })).statusCode).toBe(400);
+    expect((await post('/api/batch', { ...payload, customValuesAcknowledged: true })).json()[0].result).toBe('verified');
+    const audit = await fixture.db.configChange.findFirstOrThrow({ where: { deviceId: device.id } });
+    expect(JSON.parse(audit.requested)).toEqual({ ...payload.settings, customValuesAcknowledged: true });
+    expect(JSON.parse(audit.after!)).toMatchObject(payload.settings);
+    expect(JSON.parse(audit.after!)).not.toHaveProperty('customValuesAcknowledged');
+    expect((await post('/api/batch', { ...payload, settings: { frequency: 538 } })).json()[0].result).toBe('rejected');
+  });
+});
 describe('migration and persistence', () => {
   it('persists normalized input voltage and exposes it after a service restart', async () => {
     const device = await miner();

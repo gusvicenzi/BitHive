@@ -5,8 +5,8 @@ export const displayNameSchema = z.string().trim().min(1).max(80);
 export const hostnameSchema = z.string().trim().toLowerCase().min(1).max(63).regex(/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/);
 export const settingsSchema = z.object({
   hostname: hostnameSchema.optional(),
-  frequency: z.number().int().positive().optional(),
-  coreVoltage: z.number().int().positive().optional(),
+  frequency: z.number().int().min(1).max(65535).optional(),
+  coreVoltage: z.number().int().min(1).max(65535).optional(),
   autofanspeed: z.union([z.literal(0), z.literal(1)]).optional(),
   manualFanSpeed: z.number().int().min(0).max(100).optional(),
   stratumURL: z.string().trim().min(1).max(255).regex(/^[a-zA-Z0-9._:-]+$/).optional(),

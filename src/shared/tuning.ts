@@ -1,12 +1,15 @@
 import { z } from 'zod';
+import type { Snapshot } from './domain.js';
 
-const integer = z.number().int().positive().max(100000);
+const integer = z.number().int().positive().max(65535);
 export const rangeSchema = z.object({ minimum: integer, maximum: integer, step: integer }).strict()
   .refine(r => r.maximum >= r.minimum).refine(r => Math.floor((r.maximum - r.minimum) / r.step) < 1000);
 export const profileSchema = z.object({ frequency: integer, coreVoltage: integer,
   autofanspeed: z.union([z.literal(0), z.literal(1)]), manualFanSpeed: z.number().int().min(0).max(100) }).strict();
 export const tuningConfigSchema = z.object({
   frequency: rangeSchema, voltage: rangeSchema,
+  physicalTuningAcknowledged: z.boolean().optional(),
+  configuredFrequencyAcknowledged: z.boolean().optional(),
   maxAsicTemperature: z.number().finite().positive(), maxVrmTemperature: z.number().finite().positive(),
   maxErrorPercentage: z.number().finite().min(0).max(100),
   tolerance: z.number().finite().min(0).max(100).default(5),
@@ -19,11 +22,22 @@ export const tuningConfigSchema = z.object({
     z.object({ source: z.literal('reference'), ths: z.number().finite().positive(), frequency: integer }).strict()]),
 }).strict().refine(c => (Math.floor((c.frequency.maximum - c.frequency.minimum) / c.frequency.step) + 1) * (Math.floor((c.voltage.maximum - c.voltage.minimum) / c.voltage.step) + 1) <= 10000);
 export type TuningConfig = z.infer<typeof tuningConfigSchema>;
+export function tuningFrequency(snapshot: Snapshot, config: TuningConfig) {
+  return config.configuredFrequencyAcknowledged === true ? snapshot.settings.frequency : snapshot.actualFrequency;
+}
+export function tuningTelemetryFailure(snapshot: Snapshot, config: TuningConfig) {
+  if ([snapshot.hashRate, snapshot.power, snapshot.temp, snapshot.vrTemp, snapshot.errorRate, snapshot.uptime].some(value => value === undefined || !Number.isFinite(value))) return 'missingTelemetry';
+  const frequency = tuningFrequency(snapshot, config);
+  if (frequency === undefined || !Number.isFinite(frequency) || frequency <= 0) return config.configuredFrequencyAcknowledged === true ? 'missingConfiguredFrequency' : 'missingActualFrequency';
+  if (config.expected.source === 'firmware' && !(snapshot.expectedHashrate && snapshot.expectedHashrate > 0)) return 'missingTelemetry';
+  return null;
+}
 export type TuningProfile = z.infer<typeof profileSchema>;
 export type TuningPhase = 'baseline' | 'applying' | 'stabilizing' | 'measuring' | 'recovering' | 'confirming' | 'restoring' | 'paused' | 'completed' | 'stopped' | 'failed' | 'recovery_required';
 export type AttemptKind = 'baseline' | 'search' | 'confirmation';
 export type WinnerCategory = 'hashrate' | 'efficiency';
 export interface TuningSample {
+  frequency?: number; frequencySource?: 'actual' | 'configured';
   at: number; ths: number; watts: number; error: number; asic: number; vrm: number;
   expected: number; accepted?: number; rejected?: number;
 }
@@ -122,7 +136,7 @@ export function measurementFailure(summary: TuningSummary | null, config: Tuning
 
 const finite = z.number().finite();
 export const recoveryStatusSchema: z.ZodType<RecoveryStatus> = z.object({ status: z.enum(['none', 'pending', 'verified', 'required']), reason: z.string().nullable(), deadline: finite.nullable() }).strict();
-export const tuningSampleSchema: z.ZodType<TuningSample> = z.object({ at: finite, ths: finite.nonnegative(), watts: finite.nonnegative(), error: finite.nonnegative(), asic: finite, vrm: finite, expected: finite.positive(), accepted: finite.nonnegative().optional(), rejected: finite.nonnegative().optional() }).strict();
+export const tuningSampleSchema: z.ZodType<TuningSample> = z.object({ frequency: finite.positive().optional(), frequencySource: z.enum(['actual', 'configured']).optional(), at: finite, ths: finite.nonnegative(), watts: finite.nonnegative(), error: finite.nonnegative(), asic: finite, vrm: finite, expected: finite.positive(), accepted: finite.nonnegative().optional(), rejected: finite.nonnegative().optional() }).strict();
 export const tuningSummarySchema: z.ZodType<TuningSummary> = z.object({ duration: finite.positive(), ths: finite.nonnegative(), watts: finite.nonnegative(), efficiency: finite.nonnegative().nullable(), attainment: finite.nonnegative(), error: finite.nonnegative(), peakError: finite.nonnegative(), asic: finite, peakAsic: finite, vrm: finite, peakVrm: finite, rejects: finite.min(0).max(100).nullable(), expectedSource: z.enum(['firmware', 'reference']) }).strict();
 export const tuningAttemptSchema: z.ZodType<TuningAttempt> = z.object({ id: z.string(), kind: z.enum(['baseline', 'search', 'confirmation']), profile: profileSchema, outcome: z.enum(['pending', 'passed', 'failed', 'invalid']), reason: z.string().nullable(), summary: tuningSummarySchema.nullable(), startedAt: z.string(), completedAt: z.string().nullable(), candidateId: z.string().nullable() }).strict();
 export const tuningStateSchema: z.ZodType<TuningState> = z.object({
