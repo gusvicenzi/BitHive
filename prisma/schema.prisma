@@ -31,6 +31,12 @@ model Profile {
   createdAt   DateTime @default(now())
   @@index([deviceId, createdAt])
 }
+model PoolProfile {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  settings    String
+  createdAt   DateTime @default(now())
+}
 model Metric {
   id          Int      @id @default(autoincrement())
   deviceId    String

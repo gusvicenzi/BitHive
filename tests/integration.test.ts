@@ -5,7 +5,8 @@ import { createApp } from '../src/server/app.js';
 import { FleetService } from '../src/server/service.js';
 import { DemoAdapter } from '../src/server/demo.js';
 import { Collector } from '../src/server/collector.js';
-import { retention } from '../src/server/repository.js';
+import { AxeAdapter } from '../src/server/adapter.js';
+import { persistReading, retention } from '../src/server/repository.js';
 import { testDatabase } from './helpers.js';
 
 let fixture: Awaited<ReturnType<typeof testDatabase>>;
@@ -36,6 +37,19 @@ describe('custom manual settings', () => {
   });
 });
 describe('migration and persistence', () => {
+  it('persists firmware averages and returns them through the fleet API after restart', async () => {
+    const device = await miner();
+    const stored = await fixture.db.device.findUniqueOrThrow({ where: { id: device.id } });
+    const adapter = new AxeAdapter(async () => ({ ASICModel: 'BM1370', hashRate: 1700, hashRate_1m: 1600, hashRate_10m: 1500, hashRate_1h: 0 }));
+    const { snapshot } = await adapter.read('fixture.local');
+    await persistReading(fixture.db, stored, snapshot);
+    const restarted = await createApp(fixture.db, { service: new FleetService(fixture.db, hardware) });
+    try {
+      const response = await restarted.inject({ method: 'GET', url: '/api/devices', headers });
+      expect(response.statusCode).toBe(200);
+      expect(response.json()[0].snapshot).toMatchObject({ hashRate_1m: 1600, hashRate_10m: 1500, hashRate_1h: 0 });
+    } finally { await restarted.close(); }
+  });
   it('persists normalized input voltage and exposes it after a service restart', async () => {
     const device = await miner();
     const stored = await fixture.db.device.findUniqueOrThrow({ where: { id: device.id } });

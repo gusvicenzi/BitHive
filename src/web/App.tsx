@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import { aggregate, efficiency, type ActionResult, type DeviceView, type MetricView, type Settings } from '../shared/domain';
+import { aggregate, averageHashrates, efficiency, type ActionResult, type DeviceView, type MetricView, type Settings } from '../shared/domain';
 import { api } from './api';
 import { Tuning } from './Tuning';
 import { Chart } from './Chart';
@@ -9,10 +9,18 @@ import { DeviceNaming } from './DeviceNaming';
 import { PowerCard } from './PowerCard';
 import { readPowerPreferences } from './power-estimate';
 import { BestDifficulty } from './BestDifficulty';
+import { HashrateAverages } from './HashrateAverages';
+import { PoolProfiles } from './PoolProfiles';
 
 type History = { metrics: MetricView[]; events: { id: number; kind: string; timestamp: string }[]; changes: { id: number; result: string; timestamp: string; requested: string; before: string; after: string | null }[]; limit: number };
 export function App() {
   const { t, i18n } = useTranslation();
+  const [page, setPage] = useState(() => location.hash === '#pool-profiles' ? 'pools' : 'fleet');
+  useEffect(() => {
+    const navigate = () => setPage(location.hash === '#pool-profiles' ? 'pools' : 'fleet');
+    window.addEventListener('hashchange', navigate);
+    return () => window.removeEventListener('hashchange', navigate);
+  }, []);
   const [powerBasis, setPowerBasis] = useState<{ enabled: boolean; efficiency: number | null }>(readPowerPreferences);
   const onPowerBasisChange = useCallback((enabled: boolean, value: number | null) => {
     setPowerBasis({ enabled, efficiency: value });
@@ -64,7 +72,7 @@ export function App() {
   }
   function add(event: FormEvent) {
     event.preventDefault();
-    void mutation(async () => { await api('/devices', { address, ...(name.trim() ? { name } : {}) }); setAdding(false); setAddress(''); setName(''); });
+    void mutation(async () => { const device = await api<DeviceView>('/devices', { address, ...(name.trim() ? { name } : {}) }); setDetailId(device.id); setHistory(null); setAdding(false); setAddress(''); setName(''); });
   }
   const batch = (ids: string[], settings?: Settings, customValuesAcknowledged = false) => void mutation(async () => {
     setResults(await api<ActionResult[]>('/batch', { ids, action: settings ? 'configure' : 'refresh', ...(settings ? { settings, ...(customValuesAcknowledged ? { customValuesAcknowledged: true } : {}) } : {}) }));
@@ -82,17 +90,18 @@ export function App() {
   };
   return <div className="app-shell">
     <aside className="sidebar"><a href="#fleet" className="brand"><svg aria-hidden="true" viewBox="0 0 40 44"><path d="M20 2 37 12v20L20 42 3 32V12Z" fill="currentColor"/><path d="M13 13h9c8 0 9 8 3 10 7 3 4 10-3 10h-9Zm5 5v4h4c3 0 3-4 0-4Zm0 8v3h4c3 0 3-3 0-3Z" fill="#123c50"/></svg>BitHive</a>
-      <p className="sidebar-caption">{t('localFleet')}</p><nav aria-label={t('navigation')}><a className="nav-active" href="#fleet"><span aria-hidden="true">▦</span>{t('fleet')}</a><a href="#activity"><span aria-hidden="true">≋</span>{t('activity')}</a></nav>
+      <p className="sidebar-caption">{t('localFleet')}</p><nav aria-label={t('navigation')}><a className={page === 'fleet' ? 'nav-active' : ''} aria-current={page === 'fleet' ? 'page' : undefined} href="#fleet"><span aria-hidden="true">▦</span>{t('fleet')}</a><a className={page === 'pools' ? 'nav-active' : ''} aria-current={page === 'pools' ? 'page' : undefined} href="#pool-profiles"><span aria-hidden="true">⇢</span>{t('poolProfiles')}</a><a href="#activity"><span aria-hidden="true">≋</span>{t('activity')}</a></nav>
       <div className="sidebar-bottom"><span className="local-dot" />{t('localOnly')}<small>{t('collectionHint')}</small></div>
     </aside>
-    <main id="fleet"><header><div><p className="eyebrow">{t('workspace')}</p><h1>{t('fleetOverview')}</h1><p className="muted">{t('subtitle')}</p></div>
+    <main id="fleet"><header><div><p className="eyebrow">{t('workspace')}</p><h1>{t(page === 'pools' ? 'poolProfiles' : 'fleetOverview')}</h1><p className="muted">{t(page === 'pools' ? 'poolProfilesSubtitle' : 'subtitle')}</p></div>
       <div className="toolbar"><label className="language"><span className="sr-only">{t('language')}</span><select value={i18n.resolvedLanguage} onChange={event => void i18n.changeLanguage(event.target.value)}><option value="en">English</option><option value="pt-BR">Português (BR)</option></select></label>
-        <button disabled={busy} onClick={() => void mutation(() => api('/demo', {}))}>{t('tryDemo')}</button><button className="primary" onClick={() => setAdding(!adding)}>{t('addDevice')}</button></div>
+        {page === 'fleet' && <><button disabled={busy} onClick={() => void mutation(() => api('/demo', {}))}>{t('tryDemo')}</button><button className="primary" onClick={() => setAdding(!adding)}>{t('addDevice')}</button></>}</div>
     </header>
     {error && <div className="error-banner" role="alert">{t(`errors.${error}`, { defaultValue: t('errors.operationFailed') })}</div>}
+    {page === 'pools' ? <PoolProfiles devices={devices} /> : <>
     {adding && <form className="add-form panel" onSubmit={add}><h2>{t('addDevice')}</h2><div className="form-grid"><label>{t('optionalDisplayName')}<input placeholder={t('nameFromAxeos')} maxLength={80} value={name} onChange={event => setName(event.target.value)} /></label><label>{t('deviceAddress')}<input required maxLength={253} placeholder={t('addressPlaceholder')} value={address} onChange={event => setAddress(event.target.value)} /></label></div><p className="muted">{t('registrationHint')}</p><div className="form-actions"><button disabled={busy} className="primary">{busy ? t('working') : t('connectDevice')}</button><button type="button" onClick={() => setAdding(false)}>{t('cancel')}</button></div></form>}
     <section className="summary" aria-label={t('fleetSummary')}>
-      <article><span>{t('totalHashrate')}</span><strong>{number(totals.hashRate / 1000)} <small>TH/s</small></strong><p>{t('currentReadings')}</p></article>
+      <article><span>{t('totalHashrate')}</span><strong>{number(totals.hashRate / 1000)} <small>TH/s</small></strong><p>{t('currentReadings')}</p><HashrateAverages averages={totals.averageHashrates} total={totals.online} /></article>
       <PowerCard power={totals.power} onPowerBasisChange={onPowerBasisChange} partial={devices.some(d => !d.demo && d.status === 'online' && d.snapshot?.power == null)} />
       <article><span>{t('efficiency')}</span><strong>{number(fleetEfficiency)} <small>J/TH</small></strong><p>{powerBasis.enabled ? t('efficiencyWithSupplyLoss') : t('weightedEfficiency')}</p>{totals.incomplete && <p>{t('partialMetrics')}</p>}</article>
       <article className="availability"><span>{t('availability')}</span><strong>{totals.online}<small> / {totals.total}</small></strong><p><span className="local-dot" />{t('onlineDevices')}</p></article>
@@ -102,7 +111,7 @@ export function App() {
       {!!selected.length && <div className="batch-bar"><span>{t('selectedCount', { count: selected.length })}</span><button disabled={busy} onClick={() => batch(selected)}>{t('refreshSelected')}</button><button onClick={() => { const d = devices.find(d => d.id === selected[0]); if (d) showDetail(d); }}>{t('configureSelected')}</button><button onClick={() => setSelected([])}>{t('clearSelection')}</button></div>}
       {loading ? <p className="empty" role="status">{t('loading')}</p> : !devices.length ? <div className="empty"><div className="hive-mark" aria-hidden="true">⬡</div><h3>{t('emptyTitle')}</h3><p>{t('emptyHint')}</p><button onClick={() => setAdding(true)} className="primary">{t('addFirst')}</button><button disabled={busy} onClick={() => void mutation(() => api('/demo', {}))}>{t('tryDemo')}</button></div> : <div className="table-scroll"><table><thead><tr><th><input type="checkbox" aria-label={t('selectAll')} checked={!!shown.length && shown.every(d => selected.includes(d.id))} onChange={event => setSelected(event.target.checked ? shown.slice(0, 50).map(d => d.id) : [])} /></th>{['device', 'status', 'hashrate', 'power', 'inputVoltage', 'efficiency', 'temperature', 'hashErrorPercent', 'lastUpdate'].map(key => <th key={key}>{t(key)}</th>)}</tr></thead><tbody>{shown.map(device => <tr key={device.id} className={device.status !== 'online' ? 'stale-row' : ''}><td><input type="checkbox" aria-label={t('selectDevice', { name: device.name })} checked={selected.includes(device.id)} disabled={!selected.includes(device.id) && selected.length >= 50} onChange={event => setSelected(current => event.target.checked ? [...current, device.id] : current.filter(id => id !== device.id))} /></td>
         <td><button className="device-link" onClick={() => showDetail(device)}>{device.name}</button><small>{device.address} {device.demo && <span className="tag">{t('simulated')}</span>}</small><small>{device.snapshot?.model ?? t('unknownModel')}</small></td>
-        <td><span className={`status status-${device.status}`}>{t(device.status)}</span></td><td className="numeric">{number(device.snapshot?.hashRate == null ? null : device.snapshot.hashRate / 1000)}<small>TH/s</small></td><td className="numeric">{number(device.snapshot?.power)}<small>W</small></td><td className="numeric">{number(device.snapshot?.inputVoltage)}<small>V</small></td><td className="numeric">{number(efficiency(device.snapshot?.hashRate, device.snapshot?.power))}<small>J/TH</small></td><td className="numeric">{number(device.snapshot?.temp, 1)}<small>°C</small></td><td className="numeric">{number(device.snapshot?.errorRate)}<small>%</small></td><td className="last-update">{date(device.lastSeen)}</td>
+        <td><span className={`status status-${device.status}`}>{t(device.status)}</span></td><td className="numeric">{number(device.snapshot?.hashRate == null ? null : device.snapshot.hashRate / 1000)}<small>TH/s</small><HashrateAverages averages={averageHashrates([device.snapshot])} total={1} collapsible /></td><td className="numeric">{number(device.snapshot?.power)}<small>W</small></td><td className="numeric">{number(device.snapshot?.inputVoltage)}<small>V</small></td><td className="numeric">{number(efficiency(device.snapshot?.hashRate, device.snapshot?.power))}<small>J/TH</small></td><td className="numeric">{number(device.snapshot?.temp, 1)}<small>°C</small></td><td className="numeric">{number(device.snapshot?.errorRate)}<small>%</small></td><td className="last-update">{date(device.lastSeen)}</td>
       </tr>)}</tbody></table>{!shown.length && <p className="empty">{t('noMatchingDevices')}</p>}</div>}
       <div className="panel-footer"><span className="local-dot" />{t('refreshHint')}<span>{t('staleHint')}</span></div>
     </section>
@@ -117,6 +126,7 @@ export function App() {
       <Tuning key={`tuning-${detail.id}`} device={detail} />
       <div className="audit-grid"><div><h3>{t('deviceEvents')}</h3>{history?.events.length ? history.events.map(event => <p key={event.id}><time>{date(event.timestamp)}</time> {t(`events.${event.kind}`, { defaultValue: t('events.observed') })}</p>) : <p className="muted">{t('noEvents')}</p>}</div><div><h3>{t('configurationHistory')}</h3>{history?.changes.length ? history.changes.map(change => <details key={change.id}><summary>{date(change.timestamp)} · {t(`results.${change.result}`, { defaultValue: t('results.observed') })}</summary><dl>{Object.entries(JSON.parse(change.result === 'observed' ? change.after ?? '{}' : change.requested)).map(([key, value]) => <div key={key}><dt>{t(key)}</dt><dd>{typeof value === 'number' ? number(value) : typeof value === 'boolean' ? t('changed') : String(value)}</dd></div>)}</dl></details>) : <p className="muted">{t('noChanges')}</p>}</div></div>
     </section>}
+    </>}
     <footer id="activity"><span>BitHive <span className="tag">v0.1.0</span></span><span>{t('footer')}</span></footer>
     </main>
   </div>;

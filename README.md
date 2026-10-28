@@ -12,7 +12,8 @@ BitHive is intended for home miners running one or more Bitaxe/ESP-Miner devices
 - Compare individual hashrate, power, efficiency, chip temperature, hash-error percentage, status, and last successful update. Real fleet totals exclude stale readings and simulated devices. Efficiency uses paired power/hashrate readings rather than averaging device efficiencies.
 - Inspect local historical charts with labeled unit scales and reading/timestamp tooltips (hover, touch, or keyboard) for hashrate, power, and chip temperature, plus shares, errors, regulator temperature, uptime, fan speed, and best difficulty when reported.
 - Collect metrics independently of browser sessions. A running Node server is required.
-- Configure primary pool, account/payout/worker, and password using legacy or active-slot APIs. Payout formats are determined by the pool.
+- Configure primary and fallback pools, accounts/payout/workers, and passwords using legacy or slot APIs. Payout formats are determined by the pool.
+- Manage fleet-wide pool profiles from the sidebar: create, copy collected settings from a Bitaxe, edit and delete. Choose primary or fallback when copying from a Bitaxe. Load a profile into either pool in miner configuration, review the worker/password, and apply with readback verification. Profiles save address, port and user; passwords are never stored. Up to 100 shared profiles.
 - Select device-reported frequency/voltage options or acknowledge custom inputs, and use supported automatic/manual fan controls. Save and load named operating profiles per miner.
 - Refresh or configure up to 50 selected miners with an individual result for each.
 - English and complete Brazilian Portuguese UI, persisted language preference, localized numbers and dates.
@@ -21,7 +22,7 @@ BitHive is intended for home miners running one or more Bitaxe/ESP-Miner devices
 
 ### Planned, not implemented
 
-Full-range history downsampling, fallback/multi-pool administration, IPv6, custom miner HTTP ports, discovery, authentication/remote access, firmware upgrades, profile deletion, and miner removal are future work. GIF demonstrations will be added to `docs/media/` after real workflows are recorded.
+Full-range history downsampling, arbitrary pool-slot administration and fallback activation controls, IPv6, custom miner HTTP ports, discovery, authentication/remote access, firmware upgrades, operating-profile deletion, and miner removal are future work. GIF demonstrations will be added to `docs/media/` after real workflows are recorded.
 
 ## Requirements
 
@@ -190,3 +191,9 @@ Physical automatic tuning is opt-in for each run. Enable the acknowledgement swi
 Manual custom values: in Configuration, enable the risk acknowledgement to replace frequency/voltage presets with whole-number MHz/mV inputs. Blank fields keep current settings. Disabling the switch discards custom drafts; loading a custom saved profile requires acknowledgement again. Each custom request carries its own acknowledgement, recorded in the audit and never forwarded to AxeOS. Values must be positive integers within the API representation (1–65535); this is not a safe hardware operating range. Capability checks, serialized writes and readback remain active. The switch does not change AxeOS OC mode or firmware protections. The owner reported working manual writes; this is not independent validation of automatic sweeps or recovery.
 
 When `actualFrequency` is missing, Start tuning reports that specific field and offers a separate acknowledgement button to use the configured frequency for the run. Accepting does not start a run; review the limits and press Start tuning again. This choice is persisted for candidates, reference-hashrate scaling, confirmation, resume and restart recovery. Samples record the frequency and its source; the selected run displays a configured-frequency notice. Configured frequency is not independent verification of the applied ASIC clock and cannot detect ramping or throttling through `actualFrequency`. Missing temperatures, power, hashrate, error rate, uptime or required expected hashrate still block tuning. Upstream ESP-Miner exposes `actualFrequency` from `POWER_MANAGEMENT_MODULE.actual_frequency` in its [system API implementation](https://github.com/bitaxeorg/ESP-Miner/blob/master/main/http_server/system_api_json.c); the owner’s V1.0.1-rc.10 devices omit this field.
+
+### Primary and fallback pool profiles
+
+In **Pool profiles**, choose **Pool to copy → Primary pool / Fallback pool** before choosing a Bitaxe. Both sources save the same portable address/port/user profile. In miner configuration, **Load pool profile** fills the primary draft and **Load fallback pool profile** fills the fallback draft. Review the worker and password, then **Apply & verify**. Passwords are not saved in profiles.
+
+Legacy fallback fields and distinct reported secondary slots are supported; slot writes preserve validated connection metadata and passwords when omitted. A missing, unknown or aliased fallback slot leaves fallback controls disabled. BitHive does not select new slot indexes, enable forced fallback, or switch active pools. Verification confirms reported configuration, not a successful failover. Custom Starminer fallback writes still need independent physical validation; development tests use fixtures and simulated miners only.

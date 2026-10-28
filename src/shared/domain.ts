@@ -13,6 +13,10 @@ export const settingsSchema = z.object({
   stratumPort: z.number().int().min(1).max(65535).optional(),
   stratumUser: z.string().trim().min(1).max(255).optional(),
   stratumPassword: z.string().max(255).optional(),
+  fallbackStratumURL: z.string().trim().min(1).max(255).regex(/^[a-zA-Z0-9._:-]+$/).optional(),
+  fallbackStratumPort: z.number().int().min(1).max(65535).optional(),
+  fallbackStratumUser: z.string().trim().min(1).max(255).optional(),
+  fallbackStratumPassword: z.string().max(255).optional(),
 }).strict().refine(s => Object.keys(s).length > 0)
   .refine(s => s.hostname === undefined || Object.keys(s).length === 1);
 export type Settings = z.infer<typeof settingsSchema>;
@@ -29,6 +33,10 @@ export interface Snapshot {
   firmwareProtection?: boolean;
   resetReason?: string;
   hashRate?: number;
+  /** Firmware-reported rolling averages, in GH/s. */
+  hashRate_1m?: number;
+  hashRate_10m?: number;
+  hashRate_1h?: number;
   power?: number;
   /** Measured supply input voltage in volts. */
   inputVoltage?: number;
@@ -40,8 +48,8 @@ export interface Snapshot {
   uptime?: number;
   fanRpm?: number;
   bestDiff?: string;
-  settings: Omit<Settings, 'stratumPassword'>;
-  capabilities: { frequencies: number[]; voltages: number[]; writable: (keyof Settings)[]; poolMode: 'legacy' | 'slots' | 'none' };
+  settings: Omit<Settings, 'stratumPassword' | 'fallbackStratumPassword'>;
+  capabilities: { frequencies: number[]; voltages: number[]; writable: (keyof Settings)[]; poolMode: 'legacy' | 'slots' | 'none'; fallbackPoolMode?: 'legacy' | 'slots' | 'none' };
 }
 export interface DeviceView {
   id: string;
@@ -64,6 +72,14 @@ export type ActionResult = { id: string; result: 'verified' | 'unverified' | 'un
 export function efficiency(hashRate?: number | null, power?: number | null) {
   return hashRate != null && hashRate > 0 && power != null ? power * 1000 / hashRate : null;
 }
+export const hashratePeriods = ['1m', '10m', '1h'] as const;
+export function averageHashrates(snapshots: (Snapshot | null)[]) {
+  return hashratePeriods.map(period => {
+    const values = snapshots.map(snapshot => snapshot?.[`hashRate_${period}`])
+      .filter((value): value is number => value != null && Number.isFinite(value) && value >= 0);
+    return { period, value: values.length ? values.reduce((sum, value) => sum + value, 0) : null, count: values.length };
+  });
+}
 export function aggregate(devices: DeviceView[]) {
   const online = devices.filter(d => d.status === 'online');
   const hashRate = online.reduce((n, d) => n + (d.snapshot?.hashRate ?? 0), 0);
@@ -71,6 +87,7 @@ export function aggregate(devices: DeviceView[]) {
   const paired = online.filter(d => d.snapshot?.hashRate != null && d.snapshot.power != null);
   return {
     online: online.length, total: devices.length, hashRate, power,
+    averageHashrates: averageHashrates(online.map(device => device.snapshot)),
     efficiency: efficiency(paired.reduce((n, d) => n + d.snapshot!.hashRate!, 0), paired.reduce((n, d) => n + d.snapshot!.power!, 0)),
     incomplete: online.some(d => d.snapshot?.hashRate == null || d.snapshot.power == null),
   };

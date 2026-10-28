@@ -112,7 +112,7 @@ describe('fleet interface', () => {
   });
   it('requires acknowledgement again when loading a saved custom profile', async () => {
     const device = await demoDevice(); const apply = vi.fn();
-    vi.stubGlobal('fetch', vi.fn(() => response([{ id: 'custom', name: 'Custom', settings: { frequency: 537 } }])));
+    vi.stubGlobal('fetch', vi.fn((url: string) => response(url === '/api/pool-profiles' ? [] : [{ id: 'custom', name: 'Custom', settings: { frequency: 537 } }])));
     render(<Configuration device={device} count={1} busy={false} onApply={apply} />);
     await userEvent.click(screen.getByText('Saved operating profiles'));
     await screen.findByRole('option', { name: 'Custom' });
@@ -125,7 +125,7 @@ describe('fleet interface', () => {
   });
   it('loads a saved profile without sending a configuration command', async () => {
     const device = await demoDevice(); const apply = vi.fn();
-    vi.stubGlobal('fetch', vi.fn(() => response([{ id: 'p', name: 'Quiet', settings: { frequency: 500 } }])));
+    vi.stubGlobal('fetch', vi.fn((url: string) => response(url === '/api/pool-profiles' ? [] : [{ id: 'p', name: 'Quiet', settings: { frequency: 500 } }])));
     render(<Configuration device={device} count={1} busy={false} onApply={apply} />);
     await userEvent.click(screen.getByText('Saved operating profiles'));
     await screen.findByRole('option', { name: 'Quiet' });

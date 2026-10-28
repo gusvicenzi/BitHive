@@ -98,9 +98,9 @@ export class FleetService {
       // Read immediately before writing so capability checks and pool slots are current.
       const before = await adapter.read(device.address);
       validateCapabilities(settings, before.snapshot, customValuesAcknowledged);
-      const { stratumPassword, ...publicSettings } = settings;
+      const { stratumPassword, fallbackStratumPassword, ...publicSettings } = settings;
       const audit = await this.db.configChange.create({ data: { deviceId: id, before: JSON.stringify(before.snapshot.settings),
-        requested: JSON.stringify({ ...publicSettings, ...(customValuesAcknowledged ? { customValuesAcknowledged: true } : {}), ...(stratumPassword !== undefined ? { passwordChanged: true } : {}) }), result: 'unknown' } });
+        requested: JSON.stringify({ ...publicSettings, ...(customValuesAcknowledged ? { customValuesAcknowledged: true } : {}), ...(stratumPassword !== undefined ? { passwordChanged: true } : {}), ...(fallbackStratumPassword !== undefined ? { fallbackPasswordChanged: true } : {}) }), result: 'unknown' } });
       let result: ActionResult['result'];
       let after: string | undefined;
       let acknowledged = false;
@@ -109,7 +109,7 @@ export class FleetService {
         const reading = await adapter.read(device.address);
         after = JSON.stringify(reading.snapshot.settings);
         const matches = Object.entries(publicSettings).every(([key, value]) => reading.snapshot.settings[key as keyof typeof publicSettings] === value);
-        result = matches && stratumPassword === undefined ? 'verified' : acknowledged ? 'unverified' : 'unknown';
+        result = matches && stratumPassword === undefined && fallbackStratumPassword === undefined ? 'verified' : acknowledged ? 'unverified' : 'unknown';
         await persistReading(this.db, device, reading.snapshot);
       } catch {
         result = 'unknown';

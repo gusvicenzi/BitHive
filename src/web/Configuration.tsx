@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { DeviceView, Settings } from '../shared/domain';
 import { api } from './api';
+import { poolFields, poolSettingsFor, type PoolProfile, type PoolTarget } from '../shared/pool-profiles';
 
 type SavedProfile = { id: string; name: string; settings: Settings };
 export function Configuration({ device, count, busy, onApply }: { device: DeviceView; count: number; busy: boolean; onApply: (settings: Settings, customValuesAcknowledged?: boolean) => void }) {
@@ -13,6 +14,16 @@ export function Configuration({ device, count, busy, onApply }: { device: Device
   const [profileName, setProfileName] = useState('');
   const [profileError, setProfileError] = useState('');
   const [saving, setSaving] = useState(false);
+  const [poolProfiles, setPoolProfiles] = useState<PoolProfile[]>([]);
+  const [poolProfileId, setPoolProfileId] = useState('');
+  const [poolError, setPoolError] = useState('');
+  const [fallbackProfileId, setFallbackProfileId] = useState('');
+  useEffect(() => {
+    const abort = new AbortController();
+    void api<PoolProfile[]>('/pool-profiles', undefined, abort.signal).then(setPoolProfiles)
+      .catch(e => { if (!abort.signal.aborted) setPoolError(e.message); });
+    return () => abort.abort();
+  }, []);
   useEffect(() => {
     setValues({}); setCustomValuesAcknowledged(false); setProfileError(''); setProfiles([]);
     const abort = new AbortController();
@@ -47,7 +58,16 @@ export function Configuration({ device, count, busy, onApply }: { device: Device
     if (needsAcknowledgement && !customValuesAcknowledged) return;
     if (customValuesAcknowledged) onApply(values, true); else onApply(values);
     // Clear the submitted draft so an uncertain write cannot be casually replayed.
-    setValues({});
+    setValues({}); setPoolProfileId(''); setFallbackProfileId('');
+  }
+  function loadPoolProfile(id: string, target: PoolTarget) {
+    if (target === 'primary') setPoolProfileId(id); else setFallbackProfileId(id);
+    const profile = poolProfiles.find(p => p.id === id);
+    if (profile) setValues(current => {
+      const next = { ...current, ...poolSettingsFor(profile.settings, target) };
+      delete next[poolFields[target][3]];
+      return next;
+    });
   }
   async function saveProfile() {
     setSaving(true); setProfileError('');
@@ -83,16 +103,27 @@ export function Configuration({ device, count, busy, onApply }: { device: Device
       </div>
       {(!supported('frequency') || !supported('coreVoltage')) && <p className="notice">{t('unsupportedTuning')}</p>}
     </fieldset>
-    <fieldset disabled={busy || device.status !== 'online' || snapshot.capabilities.poolMode === 'none'}><legend>{t('poolPayout')}</legend>
-      <p className="muted">{t('payoutHint')}</p><div className="form-grid">
-        {(['stratumURL', 'stratumPort', 'stratumUser', 'stratumPassword'] as const).map(key => <label key={key}>{t(key)}
-          <input type={key === 'stratumPort' ? 'number' : key === 'stratumPassword' ? 'password' : 'text'} autoComplete="off"
-            min={key === 'stratumPort' ? 1 : undefined} max={key === 'stratumPort' ? 65535 : undefined} maxLength={255}
-            placeholder={key === 'stratumPassword' ? t('passwordPlaceholder') : String(snapshot.settings[key as keyof typeof snapshot.settings] ?? '')}
-            value={values[key] ?? ''} onChange={event => set(key, event.target.value, key === 'stratumPort')} />
-        </label>)}
-      </div>
-    </fieldset>
+    {(['primary', 'fallback'] as const).map(target => {
+      const fields = poolFields[target];
+      const fallback = target === 'fallback';
+      const mode = fallback ? snapshot.capabilities.fallbackPoolMode ?? 'none' : snapshot.capabilities.poolMode;
+      const profileId = fallback ? fallbackProfileId : poolProfileId;
+      return <fieldset key={target} disabled={busy || device.status !== 'online' || mode === 'none'}><legend>{t(fallback ? 'fallbackPool' : 'poolPayout')}</legend>
+        <div className="pool-load"><label>{t(fallback ? 'loadFallbackPoolProfile' : 'loadPoolProfile')}<select value={profileId} onChange={event => {
+          loadPoolProfile(event.target.value, target);
+        }}><option value="">{t('choosePoolProfile')}</option>{poolProfiles.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label><a href="#pool-profiles">{t('managePoolProfiles')}</a></div>
+        {poolError && <p role="alert">{t(`errors.${poolError}`, { defaultValue: t('errors.operationFailed') })}</p>}
+        {profileId && <p className="notice">{t(fallback ? 'fallbackProfileReview' : 'poolProfileReview')}</p>}
+        <p className="muted">{t(fallback ? mode === 'none' ? 'fallbackUnavailable' : 'fallbackPayoutHint' : 'payoutHint')}</p><div className="form-grid">
+          {fields.map((key, index) => <label key={key}>{t(key)}
+            <input type={index === 1 ? 'number' : index === 3 ? 'password' : 'text'} autoComplete="off"
+              min={index === 1 ? 1 : undefined} max={index === 1 ? 65535 : undefined} maxLength={255}
+              placeholder={index === 3 ? t('passwordPlaceholder') : String(snapshot.settings[key as keyof typeof snapshot.settings] ?? '')}
+              value={values[key] ?? ''} onChange={event => set(key, event.target.value, index === 1)} />
+          </label>)}
+        </div>
+      </fieldset>;
+    })}
     <div className="form-actions"><button className="primary" disabled={busy || device.status !== 'online' || !Object.keys(values).length || (needsAcknowledgement && !customValuesAcknowledged)}>{busy ? t('working') : t('applyVerify')}</button><span className="muted">{t('writeVerification')}</span></div>
     <details><summary>{t('savedProfiles')}</summary><p className="muted">{t('saveProfileHint')}</p><div className="profile-controls">
       <label>{t('loadProfile')}<select aria-label={t('loadProfile')} defaultValue="" onChange={event => { const profile = profiles.find(p => p.id === event.target.value); if (profile) setValues(profile.settings); }}>

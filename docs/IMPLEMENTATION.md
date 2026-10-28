@@ -21,7 +21,14 @@ The owner uses a Starminer Bitaxe 601 with customized AxeOS. Its manufacturer pa
 
 BitHive reads `GET /api/system/info`, optionally reads `GET /api/system/asic`, and writes `PATCH /api/system`. Readings use GH/s and W, with efficiency derived as W × 1000 / GH/s. Missing metrics remain absent. Unsupported/invalid ASIC metadata leaves frequency and voltage controls read-only. Settings are restricted to reported options and observable fields. A readable field is a candidate capability, not proof of a working write; readback establishes each write's result.
 
-Legacy flat pool settings and modern active-primary pool slots have separate payload mappings. Modern updates preserve validated slot fields, update only the primary slot, and use the upstream password-preservation marker for an omitted password. No firmware changes, OTA, restart, Wi-Fi modifications, fallback-pool management, or protection controls are exposed.
+Legacy flat primary/fallback settings and modern pool slots have separate payload mappings. Modern writes target the reported primaryPoolIndex or secondaryPoolIndex, preserve validated slot metadata and use the upstream password-preservation marker for an omitted password. Missing, duplicate, unknown or aliased secondary slots never enable fallback writes or fall back to flat legacy fields. Each destination has separate profile loading, values and password drafts. Portable profiles retain their original schema and require no migration. Both passwords are excluded from snapshots and audits; changes are recorded as boolean markers. No firmware changes, OTA, restart, Wi-Fi modifications, arbitrary slot selection, forced fallback or protection controls are exposed.
+
+Fallback contracts were checked against the official v2.12.0 OpenAPI, HTTP settings handler and NVS REST-name mapping, plus the current slot API, update_pool_nvs and system_api_json implementation on 2026-10-28. Fixtures cover legacy fields and distinct/non-sequential secondary slots, metadata and password preservation, rejected ambiguous mappings, persistence and uncertain-write readback. Custom firmware fallback writes have no physical validation; no connected miners were contacted during development.
+
+- [Legacy API](https://github.com/bitaxeorg/ESP-Miner/blob/v2.12.0/main/http_server/openapi.yaml)
+- [Legacy settings handler](https://github.com/bitaxeorg/ESP-Miner/blob/v2.12.0/main/http_server/http_server.c)
+- [Legacy REST-name mapping](https://github.com/bitaxeorg/ESP-Miner/blob/v2.12.0/main/nvs_config.c)
+- [Current slot serialization](https://github.com/bitaxeorg/ESP-Miner/blob/master/main/http_server/system_api_json.c)
 
 ## Data and command behavior
 
@@ -29,7 +36,9 @@ Network traffic is restricted to RFC1918 IPv4 hosts on HTTP port 80. DNS is boun
 
 Configuration reads current capabilities immediately before writing, records a redacted attempt with unknown status **before** dispatch, sends once, and then reads state. Non-secret requested fields are compared exactly. Password changes remain unverified because the API cannot read them back. If acknowledgement is lost but public fields match, they can be verified; a missing or mismatched readback preserves uncertainty. Successful readback proves reported configuration, not sustained stable operation or payout correctness. A pending restart is never performed automatically.
 
-Profiles store operating settings per device, up to 20 each. They are user-selected candidates, not claims of stability. Automatic tuning remains a typed extension point without a scheduler or actuator. This sequencing is intentional until hardware monitoring and manual configuration have been validated.
+Pool profiles use a separate global PoolProfile table with a committed additive migration, up to 100 unique named profiles. Only validated pool address, port and user are stored. Copying uses collected public snapshot settings without device requests. Loading a profile only fills the configuration draft; applying to primary or fallback uses the existing audited batch service and capability validation. Deleting a pool profile has no effect on miners. Passwords are neither accepted nor persisted in profiles.
+
+Operating profiles store operating settings per device, up to 20 each. They are user-selected candidates, not claims of stability. Automatic tuning remains a typed extension point without a scheduler or actuator. This sequencing is intentional until hardware monitoring and manual configuration have been validated.
 
 The local database uses atomic sample/device/event writes and indexed retention deletes. Samples expire after 30 days, connection events after 90 days, and configuration audits after 365 days. Histories return the latest 1,000 samples in the requested period, not downsampled full-range coverage. Per-device events and configuration changes are limited to the latest 100 each. History charts split missing readings and collection gaps. Saved profiles and device registrations have no age-based deletion.
 

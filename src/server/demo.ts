@@ -7,7 +7,7 @@ export class DemoAdapter implements MinerAdapter {
   restore(address: string, settings: Settings) { this.state.set(address, settings); }
   async read(address: string): Promise<Reading> {
     const index = Number(address.split('-').at(-1)) || 1;
-    const settings = this.state.get(address) ?? { frequency: 525, coreVoltage: 1150, autofanspeed: 1, manualFanSpeed: 60, stratumURL: 'pool.example.com', stratumPort: 3333, stratumUser: `demo.worker${index}` };
+    const settings = { frequency: 525, coreVoltage: 1150, autofanspeed: 1, manualFanSpeed: 60, stratumURL: 'pool.example.com', stratumPort: 3333, stratumUser: `demo.worker${index}`, fallbackStratumURL: 'backup.example.com', fallbackStratumPort: 3334, fallbackStratumUser: `demo.backup${index}`, ...this.state.get(address) };
     const wave = Math.sin(Date.now() / 18000 + index);
     const raw = infoSchema.parse({
       ...settings, ASICModel: index === 3 ? 'BM1366' : 'BM1370', deviceModel: index === 1 ? 'Starminer 601' : index === 3 ? 'Ultra' : 'Gamma',
@@ -27,6 +27,6 @@ export class DemoAdapter implements MinerAdapter {
   }
   async patch(address: string, settings: Settings, reading: Reading, customValuesAcknowledged = false) {
     validateCapabilities(settings, reading.snapshot, customValuesAcknowledged);
-    this.state.set(address, { ...reading.snapshot.settings, ...settings, stratumPassword: undefined });
+    this.state.set(address, { ...reading.snapshot.settings, ...settings, stratumPassword: undefined, fallbackStratumPassword: undefined });
   }
 }

@@ -1,4 +1,5 @@
 import Fastify from 'fastify';
+import { registerPoolProfileRoutes } from './pool-profile-routes.js';
 import staticFiles from '@fastify/static';
 import { z, ZodError } from 'zod';
 import type { PrismaClient } from '@prisma/client';
@@ -35,6 +36,7 @@ export async function createApp(db: PrismaClient, options: { service?: FleetServ
     reply.header('Cache-Control', 'no-store');
     return payload;
   });
+  registerPoolProfileRoutes(app, db);
   registerTuningRoutes(app, options.tuner ?? new Tuner(service));
   app.get('/api/health', () => ({ status: 'ok' }));
   app.get('/api/devices', () => service.list());
