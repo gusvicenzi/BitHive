@@ -4,6 +4,8 @@ import type { Settings } from '../shared/domain.js';
 
 export class DemoAdapter implements MinerAdapter {
   private state = new Map<string, Settings>();
+  private restartedAt = new Map<string, number>();
+  async restart(address: string) { this.restartedAt.set(address, Date.now()); }
   restore(address: string, settings: Settings) { this.state.set(address, settings); }
   async read(address: string): Promise<Reading> {
     const index = Number(address.split('-').at(-1)) || 1;
@@ -18,7 +20,7 @@ export class DemoAdapter implements MinerAdapter {
       overheat_mode: 0, miningPaused: false, resetReason: 'POWERON',
       power: index === 3 ? 12.8 : 17.2 + index, temp: 49 + index * 2 + wave,
       vrTemp: 56 + index, errorPercentage: 0.2, sharesAccepted: Math.floor(Date.now() / 30000) % 10000,
-      sharesRejected: index, uptimeSeconds: Math.floor(Date.now() / 1000) % 100000, fanrpm: 3900 + index * 100, bestDiff: '2.41G',
+      sharesRejected: index, uptimeSeconds: this.restartedAt.has(address) ? Math.floor((Date.now() - this.restartedAt.get(address)!) / 1000) : Math.floor(Date.now() / 1000) % 100000, fanrpm: 3900 + index * 100, fanspeed: settings.autofanspeed === 0 ? settings.manualFanSpeed : 55 + index, bestDiff: '2.41G',
     });
     return { raw, snapshot: normalize(raw, { deviceModel: raw.deviceModel, frequencyOptions: [400, 450, 500, 525, 550, 575], voltageOptions: [1100, 1150, 1200] }) };
   }

@@ -1,12 +1,12 @@
 import { Prisma, type PrismaClient } from '@prisma/client';
-import { poolProfileSchema, type PoolProfile } from '../shared/pool-profiles.js';
+import { poolProfileSchema, readStoredPoolSettings, type PoolProfile } from '../shared/pool-profiles.js';
 import { AppError } from './errors.js';
 
 export class PoolProfileRepository {
   constructor(private db: PrismaClient) {}
   async list(): Promise<PoolProfile[]> {
     return (await this.db.poolProfile.findMany({ orderBy: { createdAt: 'asc' }, take: 100 }))
-      .map(p => ({ id: p.id, ...poolProfileSchema.parse({ name: p.name, settings: JSON.parse(p.settings) }) }));
+      .map(p => ({ id: p.id, ...poolProfileSchema.parse({ name: p.name, settings: readStoredPoolSettings(JSON.parse(p.settings)) }) }));
   }
   async save(input: unknown, id?: string) {
     const body = poolProfileSchema.parse(input);

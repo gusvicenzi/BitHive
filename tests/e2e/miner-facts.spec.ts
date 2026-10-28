@@ -1,0 +1,30 @@
+import { expect, test } from '@playwright/test';
+test('miner details include fleet readings, a prioritized first row and independent thermal scales', async ({ page }) => {
+  const snapshot = { model: 'GammaV2', firmware: 'v2', hashRate: 1210, hashRate_1m: 1200, power: 19.4, inputVoltage: 12.03, temp: 65, vrTemp: 65, errorRate: .07, fanRpm: 4000, fanPercent: 60,
+    settings: {}, capabilities: { writable: [], frequencies: [], voltages: [], poolMode: 'none' } };
+  await page.route('**/api/devices', route => route.fulfill({ json: [{ id: 'a', name: 'Bitaxe03', address: '192.168.0.223', status: 'online', demo: false, lastSeen: '2026-10-28T17:11:50Z', snapshot }] }));
+  await page.route('**/api/devices/a/history?*', route => route.fulfill({ json: { metrics: [], events: [], changes: [], limit: 1000 } }));
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.goto('/');
+  const row = page.locator('tbody tr');
+  await expect(row.locator('.temperature-reading')).toHaveAttribute('data-band', 'high');
+  await page.getByRole('button', { name: 'Bitaxe03', exact: true }).click();
+  await expect(page.locator('.miner-headline')).toContainText('1.21 TH/s');
+  const top = await page.locator('.miner-headline > div').evaluateAll(nodes => nodes.map(node => Math.round(node.getBoundingClientRect().top)));
+  expect(new Set(top).size).toBe(1);
+  await expect(page.locator('[data-fact="temperature"] .temperature-reading')).toHaveAttribute('data-band', 'high');
+  await expect(page.locator('[data-fact="regulatorTemp"] .temperature-reading')).toHaveAttribute('data-band', 'mid');
+  const colors = await page.locator('.miner-headline .temperature-reading').evaluateAll(nodes => nodes.map(node => getComputedStyle(node).color));
+  expect(colors[0]).not.toBe(colors[1]);
+  await expect(page.locator('[data-fact="fanSpeed"]')).toContainText('4,000 RPM · 60 %');
+  await expect(page.locator('[data-fact="inputVoltage"]')).toContainText('12.03 V');
+  await expect(page.locator('[data-fact="lastUpdate"] time')).toHaveAttribute('datetime', '2026-10-28T17:11:50Z');
+  await page.screenshot({ path: 'test-results/miner-facts-desktop.png', fullPage: true });
+  await page.locator('.temperature-guide summary').click();
+  await expect(page.locator('.temperature-guide')).toContainText('Danger 105°C');
+  await page.getByLabel('Language').selectOption('pt-BR');
+  await expect(page.locator('[data-fact="power"]')).toContainText('19,4 W');
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.screenshot({ path: 'test-results/miner-facts-mobile.png', fullPage: true });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});

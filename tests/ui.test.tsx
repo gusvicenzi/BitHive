@@ -10,7 +10,7 @@ import { Configuration } from '../src/web/Configuration';
 import { DemoAdapter } from '../src/server/demo';
 import type { DeviceView } from '../src/shared/domain';
 
-afterEach(() => { cleanup(); vi.unstubAllGlobals(); localStorage.clear(); void i18n.changeLanguage('en'); });
+afterEach(() => { cleanup(); window.location.hash = '';  vi.unstubAllGlobals(); localStorage.clear(); void i18n.changeLanguage('en'); });
 const response = (data: unknown, ok = true) => Promise.resolve({ ok, json: async () => data });
 async function demoDevice(): Promise<DeviceView> {
   return { id: 'a', name: 'Gamma demo', address: 'demo-1', demo: true, status: 'online', lastSeen: new Date().toISOString(), snapshot: (await new DemoAdapter().read('demo-1')).snapshot };
@@ -42,37 +42,27 @@ describe('fleet interface', () => {
     render(<App />);
     expect(await screen.findByRole('alert')).toHaveTextContent('Check its address, power, and network');
   });
-  it('preserves loaded graphs when reselecting the open miner and clears them when switching miners', async () => {
-    const first = await demoDevice();
-    const second = { ...first, id: 'b', name: 'Second miner', address: 'demo-2' };
-    const history = { metrics: [0, 15000].map(timestamp => ({
-      timestamp: new Date(timestamp).toISOString(), hashRate: 1000, power: 15, temp: 50, vrTemp: 60, errorRate: 0,
-    })), events: [], changes: [], limit: 1000 };
-    const fetch = vi.fn((url: string) => {
-      if (url === '/api/devices') return response([first, second]);
-      if (url.includes('/a/history?')) return response(history);
-      if (url.includes('/b/history?')) return response({ error: 'deviceUnavailable' }, false);
-      return response([]);
-    });
-    vi.stubGlobal('fetch', fetch);
-    render(<App />);
-    const miner = await screen.findByRole('button', { name: first.name });
-    await userEvent.click(miner);
-    const graph = await screen.findByRole('img', { name: /Hashrate history/ });
-    const historyRequests = () => fetch.mock.calls.filter(([url]) => url.includes('/history?'));
-    expect(historyRequests()).toHaveLength(1);
-    await userEvent.click(miner);
-    expect(screen.getByRole('img', { name: /Hashrate history/ })).toBe(graph);
-    expect(screen.queryByText('Loading...')).not.toBeInTheDocument();
-    expect(historyRequests()).toHaveLength(1);
-    await userEvent.click(screen.getByRole('checkbox', { name: `Select ${first.name}` }));
+  it('separates miner pages, lazy controls, and fleet batch configuration', async () => {
+    const first = await demoDevice(); const second = { ...first, id: 'b', name: 'Second miner' };
+    const fetch = vi.fn((url: string) => response(url === '/api/devices' ? [first, second] : url.includes('/history?') ? { metrics: [], events: [], changes: [], limit: 1000 } : []));
+    vi.stubGlobal('fetch', fetch); render(<App />);
+    await userEvent.click(await screen.findByRole('button', { name: first.name }));
+    await screen.findByText('Collecting history. At least two readings are needed.');
+    expect(location.hash).toBe('#miner/a');
+    expect(screen.queryByRole('table')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Frequency (MHz)')).not.toBeInTheDocument();
+    expect(fetch.mock.calls.some(([url]) => url.includes('/tuning') || url.includes('/profiles'))).toBe(false);
+    await userEvent.click(screen.getByText('Miner configuration', { exact: true }));
+    expect(await screen.findByLabelText('Frequency (MHz)')).toBeInTheDocument();
+    await userEvent.click(screen.getAllByRole('link', { name: /Back to fleet/ })[0]);
+    await userEvent.click(await screen.findByRole('checkbox', { name: `Select ${first.name}` }));
+    await userEvent.click(screen.getByRole('checkbox', { name: `Select ${second.name}` }));
     await userEvent.click(screen.getByRole('button', { name: 'Configure selected' }));
-    expect(screen.getByRole('img', { name: /Hashrate history/ })).toBe(graph);
-    expect(historyRequests()).toHaveLength(1);
+    expect(await screen.findByLabelText('Frequency (MHz)')).toBeInTheDocument();
+    expect(location.hash).toBe('#fleet');
     await userEvent.click(screen.getByRole('button', { name: second.name }));
-    expect(await screen.findByRole('alert')).toHaveTextContent('Check its address, power, and network');
-    expect(screen.queryByRole('img', { name: /Hashrate history/ })).not.toBeInTheDocument();
-    expect(historyRequests()).toHaveLength(2);
+    await waitFor(() => expect(location.hash).toBe('#miner/b'));
+    await waitFor(() => expect(screen.queryByLabelText('Frequency (MHz)')).not.toBeInTheDocument());
   });
   it('provides accessible historical charts and a collecting state', () => {
     const { rerender } = render(<Chart metrics={[]} field="hashRate" label="Hashrate" unit="GH/s" />);
@@ -100,14 +90,14 @@ describe('fleet interface', () => {
     expect(toggle).not.toBeChecked();
     await userEvent.click(toggle);
     const frequency = screen.getByLabelText('Frequency (MHz)');
-    await userEvent.type(frequency, '537');
-    await userEvent.type(screen.getByLabelText('Core voltage (mV)'), '1160');
+    await userEvent.clear(frequency); await userEvent.type(frequency, '537');
+    await userEvent.clear(screen.getByLabelText('Core voltage (mV)')); await userEvent.type(screen.getByLabelText('Core voltage (mV)'), '1160');
     await userEvent.click(screen.getByRole('button', { name: 'Apply & verify' }));
     expect(apply).toHaveBeenCalledWith({ frequency: 537, coreVoltage: 1160 }, true);
-    expect(frequency).toHaveValue(null);
-    await userEvent.type(frequency, '538');
+    expect(frequency).toHaveValue(device.snapshot!.settings.frequency);
+    await userEvent.clear(frequency); await userEvent.type(frequency, '538');
     await userEvent.click(toggle);
-    expect(screen.getByLabelText('Frequency (MHz)')).toHaveValue('');
+    expect(screen.getByLabelText('Frequency (MHz)')).toHaveValue(String(device.snapshot!.settings.frequency));
     expect(screen.getByRole('button', { name: 'Apply & verify' })).toBeDisabled();
   });
   it('requires acknowledgement again when loading a saved custom profile', async () => {

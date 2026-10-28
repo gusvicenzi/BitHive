@@ -8,7 +8,7 @@ import { DemoAdapter } from '../src/server/demo.js';
 let fixture: Awaited<ReturnType<typeof testDatabase>>;
 let app: FastifyInstance;
 const headers = { host: 'localhost:3080', 'x-bithive': '1' };
-const settings = { stratumURL: 'pool.example.com', stratumPort: 3333, stratumUser: 'wallet.worker' };
+const settings = { stratumURL: 'pool.example.com', stratumPort: 3333, stratumAccount: 'wallet' };
 const post = (url: string, payload: unknown) => app.inject({ method: 'POST', url, payload, headers });
 beforeAll(async () => { fixture = await testDatabase(); app = await createApp(fixture.db); });
 beforeEach(async () => { await fixture.db.poolProfile.deleteMany(); await fixture.db.device.deleteMany(); });
@@ -53,9 +53,9 @@ describe('shared pool profile storage and API', () => {
     const profile = (await post('/api/pool-profiles', { name: 'Reusable', settings: { ...settings, stratumPort: 4444 } })).json();
     const configured = await createApp(fixture.db, { service });
     try {
-      const result = await configured.inject({ method: 'POST', url: '/api/batch', headers, payload: { ids: [device.id], action: 'configure', settings: profile.settings } });
+      const result = await configured.inject({ method: 'POST', url: '/api/batch', headers, payload: { ids: [device.id], action: 'configure', settings: { stratumURL: profile.settings.stratumURL, stratumPort: profile.settings.stratumPort }, poolAccounts: { primary: profile.settings.stratumAccount } } });
       expect(result.json()).toEqual([{ id: device.id, result: 'verified' }]);
-      expect((await service.list())[0].snapshot?.settings).toMatchObject(profile.settings);
+      expect((await service.list())[0].snapshot?.settings).toMatchObject({ stratumURL: profile.settings.stratumURL, stratumPort: profile.settings.stratumPort, stratumUser: `wallet.${device.snapshot!.hostname}` });
       expect(await fixture.db.configChange.count({ where: { result: 'verified' } })).toBe(1);
     } finally { await configured.close(); }
   });
@@ -88,5 +88,58 @@ describe('fallback configuration workflow', () => {
     const read = vi.spyOn(hardware, 'read');
     expect((await service.configure(device.id, { fallbackStratumPort: 5555 })).result).toBe('unknown');
     expect(patch).toHaveBeenCalledTimes(1); expect(read).toHaveBeenCalledTimes(2);
+  });
+});
+
+
+describe('profile workers', () => {
+  it('reads old stored profiles as account-only without modifying storage and saves the canonical account', async () => {
+    const old = { stratumURL: 'pool.example.com', stratumPort: 3333, stratumUser: 'account.dotted.oldworker' };
+    const row = await fixture.db.poolProfile.create({ data: { name: 'Legacy', settings: JSON.stringify(old) } });
+    const [profile] = (await app.inject({ url: '/api/pool-profiles', headers })).json();
+    expect(profile.settings).toEqual({ stratumURL: old.stratumURL, stratumPort: 3333, stratumAccount: 'account.dotted' });
+    expect((await fixture.db.poolProfile.findUniqueOrThrow({ where: { id: row.id } })).settings).toBe(JSON.stringify(old));
+    expect((await post(`/api/pool-profiles/${row.id}`, { name: 'Legacy', settings: profile.settings })).statusCode).toBe(200);
+    expect((await fixture.db.poolProfile.findUniqueOrThrow({ where: { id: row.id } })).settings).not.toContain('oldworker');
+  });
+  it('derives each selected miner worker from its freshly read AxeOS hostname for both pools', async () => {
+    const hardware = new DemoAdapter(); const service = new FleetService(fixture.db, hardware);
+    const first = await service.register('192.168.1.41', 'Unrelated display label');
+    const second = await service.register('192.168.1.42', 'Another display label');
+    hardware.restore(first.address, { ...(await hardware.read(first.address)).snapshot.settings, hostname: 'Living Room AXE' });
+    hardware.restore(second.address, { ...(await hardware.read(second.address)).snapshot.settings, hostname: 'OFFICE AXE' });
+    // Stored snapshots still contain the old name; command resolution must use the fresh read.
+    const configured = await createApp(fixture.db, { service });
+    try {
+      const response = await configured.inject({ method: 'POST', url: '/api/batch', headers, payload: {
+        ids: [first.id, second.id], action: 'configure', poolAccounts: { primary: 'wallet', fallback: 'backup.account' },
+      } });
+      expect(response.json().map((r: { result: string }) => r.result)).toEqual(['verified', 'verified']);
+      const devices = await service.list();
+      expect(devices[0].snapshot?.settings).toMatchObject({ stratumUser: 'wallet.livingroomaxe', fallbackStratumUser: 'backup.account.livingroomaxe' });
+      expect(devices[1].snapshot?.settings).toMatchObject({ stratumUser: 'wallet.officeaxe', fallbackStratumUser: 'backup.account.officeaxe' });
+      expect((await fixture.db.configChange.findMany()).map(c => JSON.parse(c.requested).stratumUser)).toContain('wallet.officeaxe');
+    } finally { await configured.close(); }
+  });
+  it('rejects ambiguous requests and fails only the miner with no AxeOS name without dispatching its configuration', async () => {
+    const hardware = new DemoAdapter(); const service = new FleetService(fixture.db, hardware);
+    const first = await service.register('192.168.1.41'); const second = await service.register('192.168.1.42');
+    const originalRead = hardware.read.bind(hardware);
+    vi.spyOn(hardware, 'read').mockImplementation(async address => {
+      const reading = await originalRead(address);
+      if (address === second.address) { delete reading.snapshot.hostname; delete reading.snapshot.settings.hostname; }
+      return reading;
+    });
+    const patch = vi.spyOn(hardware, 'patch');
+    const configured = await createApp(fixture.db, { service });
+    try {
+      const base = { ids: [first.id, second.id], action: 'configure', poolAccounts: { primary: 'wallet' } };
+      const result = await configured.inject({ method: 'POST', url: '/api/batch', headers, payload: base });
+      expect(result.json()).toEqual([{ id: first.id, result: 'verified' }, { id: second.id, result: 'rejected', reason: 'axeosNameRequired' }]);
+      expect(patch).toHaveBeenCalledTimes(1);
+      for (const payload of [{ ...base, settings: { stratumUser: 'copied.worker' } }, { ...base, poolAccounts: {} }, { ...base, action: 'refresh' }]) {
+        expect((await configured.inject({ method: 'POST', url: '/api/batch', headers, payload })).statusCode).toBe(400);
+      }
+    } finally { await configured.close(); }
   });
 });

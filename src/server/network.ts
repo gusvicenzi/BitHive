@@ -21,7 +21,7 @@ export async function resolveAddress(host: string) {
     return records[0].address;
   } finally { clearTimeout(timer); }
 }
-export type Transport = (host: string, path: string, method?: 'GET' | 'PATCH', body?: unknown) => Promise<unknown>;
+export type Transport = (host: string, path: string, method?: 'GET' | 'PATCH' | 'POST', body?: unknown) => Promise<unknown>;
 export const transport: Transport = async (host, path, method = 'GET', body) => {
   const address = await resolveAddress(host);
   return new Promise((resolve, reject) => {

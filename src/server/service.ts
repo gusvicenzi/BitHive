@@ -2,11 +2,12 @@ import type { Device } from '@prisma/client';
 import { grid, profileSchema, tuningConfigSchema, tuningTelemetryFailure, type TuningProfile } from '../shared/tuning.js';
 import type { Reading } from './adapter.js';
 import { Prisma, type PrismaClient } from '@prisma/client';
-import { type Settings, type ActionResult, addressSchema, settingsSchema, displayNameSchema } from '../shared/domain.js';
+import { type Settings, type ActionResult, type RestartResult, addressSchema, settingsSchema, displayNameSchema } from '../shared/domain.js';
 import { AxeAdapter, type MinerAdapter, validateCapabilities, validateTuningCapabilities } from './adapter.js';
 import { DemoAdapter } from './demo.js';
 import { Limiter, DeviceLocks } from './concurrency.js';
 import { AppError } from './errors.js';
+import { poolAccountsSchema, poolUserForAccount, type PoolAccounts } from '../shared/pool-profiles.js';
 import { persistReading, snapshotOf, view } from './repository.js';
 
 export class FleetService {
@@ -78,8 +79,39 @@ export class FleetService {
       }
     }));
   }
-  async configure(id: string, input: Settings, customValuesAcknowledged = false): Promise<ActionResult> {
-    const settings = settingsSchema.parse(input);
+  async restart(id: string): Promise<RestartResult> {
+    return this.locks.run(id, () => this.limiter.run(async () => {
+      const device = await this.device(id);
+      if (await this.db.tuningRun.findFirst({ where: { deviceId: id, activeSlot: 1 } })) throw new AppError('tuningOwnsDevice', 409);
+      if (await this.db.event.findFirst({ where: { deviceId: id, kind: 'restartRequested', timestamp: { gt: new Date(Date.now() - 30000) } } })) throw new AppError('restartCooldown', 409);
+      const adapter = device.demo ? this.demo : this.hardware;
+      if (!adapter.restart) throw new AppError('unsupported');
+      if (device.demo && snapshotOf(device)) this.demo.restore(device.address, snapshotOf(device)!.settings);
+      const before = await adapter.read(device.address);
+      await persistReading(this.db, device, before.snapshot);
+      // Persist intent before sending: a crash or lost acknowledgement must not cause an automatic replay.
+      await this.db.event.create({ data: { deviceId: id, kind: 'restartRequested' } });
+      let result: RestartResult['result'] = 'acknowledged';
+      try { await adapter.restart(device.address); }
+      catch (error) { result = error instanceof AppError && ['unsupported', 'deviceRejected'].includes(error.code) ? 'rejected' : 'unknown'; }
+      let reachable = false;
+      try {
+        const after = await adapter.read(device.address);
+        reachable = true;
+        if (result !== 'rejected' && before.snapshot.uptime !== undefined && after.snapshot.uptime !== undefined && after.snapshot.uptime < before.snapshot.uptime) result = 'restarted';
+        await persistReading(this.db, device, after.snapshot);
+      } catch {
+        await this.db.device.update({ where: { id }, data: { failures: { increment: 1 }, nextPoll: new Date(Date.now() + 5000) } });
+      }
+      await this.db.event.create({ data: { deviceId: id, kind: `restart${result[0].toUpperCase()}${result.slice(1)}` } });
+      return { id, result, reachable };
+    }));
+  }
+  async configure(id: string, input: Settings, customValuesAcknowledged = false, accounts?: PoolAccounts): Promise<ActionResult> {
+    const poolAccounts = accounts === undefined ? undefined : poolAccountsSchema.parse(accounts);
+    const baseSettings = poolAccounts && !Object.keys(input).length ? {} : settingsSchema.parse(input);
+    if (poolAccounts && (baseSettings.hostname !== undefined || (poolAccounts.primary !== undefined && baseSettings.stratumUser !== undefined) || (poolAccounts.fallback !== undefined && baseSettings.fallbackStratumUser !== undefined))) throw new AppError('invalidInput');
+    let settings = baseSettings;
     return this.locks.run(id, () => this.limiter.run(async () => {
       let device = await this.device(id);
       if (await this.db.tuningRun.findFirst({ where: { deviceId: id, activeSlot: 1 } })) throw new AppError('tuningOwnsDevice', 409);
@@ -97,6 +129,14 @@ export class FleetService {
       }
       // Read immediately before writing so capability checks and pool slots are current.
       const before = await adapter.read(device.address);
+      if (poolAccounts) {
+        try {
+          settings = { ...baseSettings,
+            ...(poolAccounts.primary !== undefined ? { stratumUser: poolUserForAccount(poolAccounts.primary, before.snapshot.hostname) } : {}),
+            ...(poolAccounts.fallback !== undefined ? { fallbackStratumUser: poolUserForAccount(poolAccounts.fallback, before.snapshot.hostname) } : {}),
+          };
+        } catch (error) { throw new AppError(error instanceof Error ? error.message : 'poolWorkerInvalid'); }
+      }
       validateCapabilities(settings, before.snapshot, customValuesAcknowledged);
       const { stratumPassword, fallbackStratumPassword, ...publicSettings } = settings;
       const audit = await this.db.configChange.create({ data: { deviceId: id, before: JSON.stringify(before.snapshot.settings),
@@ -189,9 +229,9 @@ export class FleetService {
       return { result, auditId: audit.id, snapshot: after?.snapshot ?? null };
     });
   }
-  async batch(ids: string[], action: 'refresh' | 'configure', settings?: Settings, customValuesAcknowledged = false) {
+  async batch(ids: string[], action: 'refresh' | 'configure', settings?: Settings, customValuesAcknowledged = false, poolAccounts?: PoolAccounts) {
     return Promise.all(ids.map(async id => {
-      try { return action === 'refresh' ? await this.poll(id) : await this.configure(id, settings!, customValuesAcknowledged); }
+      try { return action === 'refresh' ? await this.poll(id) : await this.configure(id, settings ?? {}, customValuesAcknowledged, poolAccounts); }
       catch (error) { return { id, result: 'rejected', reason: error instanceof AppError ? error.code : 'operationFailed' } as ActionResult; }
     }));
   }

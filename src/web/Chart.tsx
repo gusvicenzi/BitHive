@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import type { MetricView } from '../shared/domain';
 import { nearestSample, valueScale, hashRateScale } from './chart-data';
 
-export function Chart({ metrics, field, unit, label }: { metrics: MetricView[]; field: 'hashRate' | 'temp' | 'power'; unit: string; label: string }) {
+export function Chart({ metrics, field, unit, label, bucketMinutes }: { bucketMinutes?: number; metrics: MetricView[]; field: 'hashRate' | 'temp' | 'power'; unit: string; label: string }) {
   const { t, i18n } = useTranslation();
   const [activeTime, setActiveTime] = useState<number | null>(null);
   const tooltipId = useId();
@@ -25,7 +25,7 @@ export function Chart({ metrics, field, unit, label }: { metrics: MetricView[]; 
   for (const m of ordered) {
     if (m[field] == null || !Number.isFinite(m[field])) { segments.push([]); continue; }
     let segment = segments.at(-1);
-    if (!segment || (segment.length && Date.parse(m.timestamp) - Date.parse(segment.at(-1)!.timestamp) > 90000)) {
+    if (!segment || (segment.length && Date.parse(m.timestamp) - Date.parse(segment.at(-1)!.timestamp) > (bucketMinutes ? bucketMinutes * 60000 * 2 : 90000))) {
       segment = []; segments.push(segment);
     }
     segment.push(m);

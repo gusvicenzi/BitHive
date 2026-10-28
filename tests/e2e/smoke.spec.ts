@@ -13,18 +13,23 @@ test('first run, demonstration fleet, configuration readback and language', asyn
   await expect(page.getByRole('columnheader', { name: 'Input voltage', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Bitaxe 1', exact: true }).locator('xpath=ancestor::tr')).toContainText('5.11');
   await page.getByRole('button', { name: 'Bitaxe 1', exact: true }).click();
+  await page.locator('.miner-disclosure > summary').first().click();
+  await page.locator('.miner-disclosure > summary').nth(1).click();
   await expect(page.locator('.device-facts div').filter({ has: page.getByText('Input voltage', { exact: true }) })).toContainText('5.11 V');
   await expect(page.getByText('Starminer 601').first()).toBeVisible();
   await page.getByRole('combobox', { name: 'Frequency (MHz)', exact: true }).selectOption('550');
   await page.getByRole('button', { name: 'Apply & verify' }).click();
   await expect(page.getByText('Verified', { exact: true }).first()).toBeVisible();
-  await expect(page.getByRole('combobox', { name: 'Frequency (MHz)', exact: true }).locator('option').first()).toContainText('550');
+  await expect(page.getByRole('combobox', { name: 'Frequency (MHz)', exact: true })).toHaveValue('550');
   await page.getByText('Saved operating profiles', { exact: true }).click();
   await page.getByLabel('Profile name', { exact: true }).fill('Current operating settings');
   await page.getByRole('button', { name: 'Save operating fields' }).click();
   await expect(page.getByLabel('Load a profile').locator('option')).toContainText(['Choose a profile', 'Current operating settings']);
   await page.reload();
+  await page.getByRole('link', { name: 'Fleet', exact: true }).click();
   await page.getByRole('button', { name: 'Bitaxe 1', exact: true }).click();
+  await page.locator('.miner-disclosure > summary').first().click();
+  await page.locator('.miner-disclosure > summary').nth(1).click();
   await page.getByText('Saved operating profiles', { exact: true }).click();
   await page.getByLabel('Load a profile').selectOption({ label: 'Current operating settings' });
   await expect(page.getByRole('combobox', { name: 'Frequency (MHz)', exact: true })).toHaveValue('550');
@@ -37,15 +42,24 @@ test('first run, demonstration fleet, configuration readback and language', asyn
   const customRequest = page.waitForRequest(request => request.url().endsWith('/api/batch') && request.method() === 'POST');
   await page.getByRole('button', { name: 'Apply & verify' }).click();
   expect((await customRequest).postDataJSON()).toMatchObject({ settings: { frequency: 537, coreVoltage: 1160 }, customValuesAcknowledged: true });
-  await expect(page.getByRole('spinbutton', { name: 'Frequency (MHz)', exact: true })).toHaveAttribute('placeholder', '537');
-  await expect(page.getByRole('spinbutton', { name: 'Core voltage (mV)', exact: true })).toHaveAttribute('placeholder', '1160');
+  await expect(page.getByRole('spinbutton', { name: 'Frequency (MHz)', exact: true })).toHaveValue('537');
+  await expect(page.getByRole('spinbutton', { name: 'Core voltage (mV)', exact: true })).toHaveValue('1160');
   await page.setViewportSize({ width: 390, height: 844 });
   await page.locator('.configuration').screenshot({ path: 'test-results/bithive-custom-configuration-mobile.png' });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.setViewportSize({ width: 1280, height: 720 });
   await customSwitch.uncheck();
-  await expect(page.getByRole('combobox', { name: 'Frequency (MHz)', exact: true }).locator('option').first()).toContainText('537');
+  await expect(page.getByRole('combobox', { name: 'Frequency (MHz)', exact: true })).toHaveValue('537');
+  // A freshly created demo has only one averaged bucket. Supply two explicit
+  // averaged fixture points for chart interaction checks without waiting minutes.
+  await page.route('**/api/devices/*/history?*', async route => {
+    const response = await route.fetch(); const data = await response.json();
+    if (data.metrics.length === 1) data.metrics.unshift({ ...data.metrics[0], timestamp: new Date(Date.parse(data.metrics[0].timestamp) - 300000).toISOString() });
+    await route.fulfill({ json: data });
+  });
+  await page.getByLabel('Time range').selectOption('24');
   for (const [label, unit] of [['Hashrate', 'TH/s'], ['Power', 'W'], ['Chip temperature', '°C']]) {
+    await page.getByLabel('Chart metric').selectOption(label === 'Hashrate' ? 'hashRate' : label === 'Power' ? 'power' : 'temp');
     const chart = page.getByRole('slider', { name: `Inspect ${label} history` });
     await expect(page.getByLabel(`${label} scale (${unit})`)).toBeVisible();
     await chart.hover({ position: { x: 5, y: 80 } });
@@ -62,6 +76,7 @@ test('first run, demonstration fleet, configuration readback and language', asyn
     await page.keyboard.press('Escape');
     await expect(chart.getByRole('tooltip')).toHaveCount(0);
   }
+  await page.getByLabel('Chart metric').selectOption('hashRate');
   await page.getByRole('slider', { name: 'Inspect Hashrate history' }).hover({ position: { x: 20, y: 80 } });
   await page.locator('.charts').screenshot({ path: 'test-results/bithive-chart-tooltip.png' });
   await page.getByLabel('AxeOS name (hostname)').fill('demo-office');
@@ -73,10 +88,11 @@ test('first run, demonstration fleet, configuration readback and language', asyn
   await expect(page.getByRole('heading', { name: 'Office miner', exact: true })).toBeVisible();
   await page.screenshot({ path: 'test-results/bithive-detail.png', fullPage: true });
   await page.getByLabel('Language').selectOption('pt-BR');
-  await expect(page.getByRole('columnheader', { name: 'Tensão de entrada', exact: true })).toBeVisible();
   await expect(page.locator('.device-facts div').filter({ has: page.getByText('Tensão de entrada', { exact: true }) })).toContainText('5,11 V');
+  await page.getByRole('link', { name: 'Frota', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Sua colmeia, à vista.' })).toBeVisible();
   await page.reload();
+  await page.getByRole('link', { name: 'Frota', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Sua colmeia, à vista.' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Office miner', exact: true })).toBeVisible();
   await expect(page.getByLabel('Eficiência da fonte (%)')).toHaveValue('90');
@@ -110,13 +126,16 @@ test('graph TH/s, fleet hash errors and nonzero power-supply estimates', async (
   await expect(page.getByLabel(/Miner power 56.7 W/)).toContainText('56.7+13.3=70.0 W');
   await expect(efficiencyCard.locator('strong')).toContainText('40.89');
   await page.reload();
+  await page.getByRole('link', { name: 'Fleet', exact: true }).click();
   await expect(page.getByLabel('Power supply efficiency (%)')).toHaveValue('81');
   await expect(efficiencyCard.locator('strong')).toContainText('40.89');
   await page.locator('.summary').screenshot({ path: 'test-results/bithive-power-estimate.png' });
   await page.getByRole('button', { name: 'Office miner', exact: true }).click();
+  await page.locator('.miner-disclosure > summary').first().click();
+  await page.locator('.miner-disclosure > summary').nth(1).click();
   const hashGraph = page.getByRole('img', { name: /Hashrate history/ });
   await expect(hashGraph).toBeVisible();
-  await page.getByRole('button', { name: 'Office miner', exact: true }).click();
+  await page.reload();
   await expect(hashGraph).toBeVisible();
   await expect(page.locator('.detail').getByText('Loading...', { exact: true })).toHaveCount(0);
   const difficulty = page.getByRole('button', { name: 'Show full best difficulty' });

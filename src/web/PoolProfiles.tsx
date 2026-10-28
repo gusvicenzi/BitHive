@@ -29,19 +29,19 @@ export function PoolProfiles({ devices }: { devices: DeviceView[] }) {
   function open(profile?: PoolProfile) {
     setId(profile?.id ?? null); setName(profile?.name ?? '');
     setUrl(profile?.settings.stratumURL ?? ''); setPort(String(profile?.settings.stratumPort ?? 3333));
-    setUser(profile?.settings.stratumUser ?? ''); setSource(''); setError(''); setNotice(''); setDeleting(false);
+    setUser(profile?.settings.stratumAccount ?? ''); setSource(''); setError(''); setNotice(''); setDeleting(false);
   }
   function copy(deviceId: string) {
     setSource(deviceId); setError(''); setNotice('');
     const device = eligible.find(d => d.id === deviceId);
     if (!device?.snapshot) return;
     const settings = poolSettingsFrom(device.snapshot.settings, copyTarget)!;
-    setUrl(settings.stratumURL); setPort(String(settings.stratumPort)); setUser(settings.stratumUser);
+    setUrl(settings.stratumURL); setPort(String(settings.stratumPort)); setUser(settings.stratumAccount);
     if (!name.trim()) setName(device.name);
   }
   async function save(event: FormEvent) {
     event.preventDefault(); setError(''); setNotice('');
-    const parsed = poolProfileSchema.safeParse({ name, settings: { stratumURL: url, stratumPort: Number(port), stratumUser: user } });
+    const parsed = poolProfileSchema.safeParse({ name, settings: { stratumURL: url, stratumPort: Number(port), stratumAccount: user } });
     if (!parsed.success) { setError('invalidInput'); return; }
     setBusy(true);
     try {
@@ -63,7 +63,7 @@ export function PoolProfiles({ devices }: { devices: DeviceView[] }) {
     {error && <p className="error-banner" role="alert">{t(`errors.${error}`, { defaultValue: t('errors.operationFailed') })}</p>}
     {notice && <p className="notice" role="status">{t(notice)}</p>}
     <div className="pool-layout"><section className="panel pool-library"><div className="section-title"><h2>{t('poolLibrary')} <span className="count">{profiles.length}</span></h2><button type="button" disabled={busy} onClick={() => open()}>{t('newPoolProfile')}</button></div>
-      {!loaded && !error ? <p className="empty" role="status">{t('loading')}</p> : !profiles.length ? <div className="empty"><h3>{t('noPoolProfiles')}</h3><p>{t('noPoolProfilesHint')}</p></div> : <div className="pool-profile-list">{profiles.map(p => <button type="button" key={p.id} className={id === p.id ? 'pool-profile is-selected' : 'pool-profile'} aria-pressed={id === p.id} disabled={busy} onClick={() => open(p)}><strong>{p.name}</strong><span className="pool-endpoint">{p.settings.stratumURL}<span>:{p.settings.stratumPort}</span></span><small>{p.settings.stratumUser}</small></button>)}</div>}
+      {!loaded && !error ? <p className="empty" role="status">{t('loading')}</p> : !profiles.length ? <div className="empty"><h3>{t('noPoolProfiles')}</h3><p>{t('noPoolProfilesHint')}</p></div> : <div className="pool-profile-list">{profiles.map(p => <button type="button" key={p.id} className={id === p.id ? 'pool-profile is-selected' : 'pool-profile'} aria-pressed={id === p.id} disabled={busy} onClick={() => open(p)}><strong>{p.name}</strong><span className="pool-endpoint">{p.settings.stratumURL}<span>:{p.settings.stratumPort}</span></span><small>{p.settings.stratumAccount}</small></button>)}</div>}
     </section>
     <form className="panel pool-editor" onSubmit={event => void save(event)}><fieldset disabled={busy || !loaded}><legend><h2>{t(id ? 'editPoolProfile' : 'newPoolProfile')}</h2></legend>
       <label>{t('copyPoolSource')}<select value={copyTarget} onChange={event => { setCopyTarget(event.target.value as PoolTarget); setSource(''); setNotice(''); }}><option value="primary">{t('primaryPool')}</option><option value="fallback">{t('fallbackPool')}</option></select></label>
@@ -71,8 +71,8 @@ export function PoolProfiles({ devices }: { devices: DeviceView[] }) {
       <p className="muted">{t('poolCopyHint')}</p>{source && <p className="notice">{t('poolCopiedHint')}</p>}
       <label>{t('poolProfileName')}<input required maxLength={80} value={name} onChange={e => setName(e.target.value)} /></label>
       <div className="pool-fields"><label>{t('stratumURL')}<input required maxLength={255} value={url} onChange={e => setUrl(e.target.value)} placeholder="pool.example.com" /></label><label>{t('stratumPort')}<input required type="number" min="1" max="65535" step="1" value={port} onChange={e => setPort(e.target.value)} /></label></div>
-      <label>{t('stratumUser')}<input required maxLength={255} value={user} onChange={e => setUser(e.target.value)} /></label>
-      <p className="muted">{t('poolCredentialsHint')}</p>
+      <label>{t('stratumAccount')}<input required maxLength={255} value={user} onChange={e => setUser(e.target.value)} /></label>
+      <p className="muted">{t('poolWorkerRule')}</p><p className="muted">{t('poolCredentialsHint')}</p>
       <div className="form-actions"><button className="primary" disabled={!name.trim() || !url.trim() || !user.trim()}>{busy ? t('working') : t('savePoolProfile')}</button>{id && <button type="button" onClick={() => setDeleting(true)}>{t('deletePoolProfile')}</button>}</div>
       {deleting && <div className="pool-delete"><p>{t('deletePoolProfileConfirm', { name })}</p><div className="form-actions"><button type="button" onClick={() => void remove()}>{t('confirmDeletePoolProfile')}</button><button type="button" onClick={() => setDeleting(false)}>{t('cancel')}</button></div></div>}
     </fieldset></form></div>

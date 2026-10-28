@@ -6,7 +6,7 @@ import '@testing-library/jest-dom/vitest';
 import i18n from '../src/web/i18n';
 import { App } from '../src/web/App';
 
-afterEach(() => { cleanup(); vi.unstubAllGlobals(); localStorage.clear(); void i18n.changeLanguage('en'); });
+afterEach(() => { cleanup(); window.location.hash = ''; vi.unstubAllGlobals(); localStorage.clear(); void i18n.changeLanguage('en'); });
 describe('input voltage in miner views', () => {
   it.each([
     { voltage: 5.21, status: 'online', language: 'en', label: 'Input voltage', cell: '5.21V', fact: '5.21 V' },
@@ -27,7 +27,7 @@ describe('input voltage in miner views', () => {
     expect(within(row).getAllByRole('cell')[columns.indexOf(header)]).toHaveTextContent(cell);
     if (status !== 'online') expect(row).toHaveClass('stale-row');
     await userEvent.click(button);
-    const term = screen.getByText(label, { selector: 'dt', exact: true });
+    const term = await screen.findByText(label, { selector: 'dt', exact: true });
     expect(term.nextElementSibling).toHaveTextContent(fact);
   });
 });

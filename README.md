@@ -13,9 +13,10 @@ BitHive is intended for home miners running one or more Bitaxe/ESP-Miner devices
 - Inspect local historical charts with labeled unit scales and reading/timestamp tooltips (hover, touch, or keyboard) for hashrate, power, and chip temperature, plus shares, errors, regulator temperature, uptime, fan speed, and best difficulty when reported.
 - Collect metrics independently of browser sessions. A running Node server is required.
 - Configure primary and fallback pools, accounts/payout/workers, and passwords using legacy or slot APIs. Payout formats are determined by the pool.
-- Manage fleet-wide pool profiles from the sidebar: create, copy collected settings from a Bitaxe, edit and delete. Choose primary or fallback when copying from a Bitaxe. Load a profile into either pool in miner configuration, review the worker/password, and apply with readback verification. Profiles save address, port and user; passwords are never stored. Up to 100 shared profiles.
+- Manage fleet-wide pool profiles from the sidebar: create, copy collected settings from a Bitaxe, edit and delete. Choose primary or fallback when copying from a Bitaxe. Load a profile into either pool in miner configuration, review the generated worker and password, and apply with readback verification. Profiles save address, port and account without a worker; passwords are never stored. Up to 100 shared profiles.
 - Select device-reported frequency/voltage options or acknowledge custom inputs, and use supported automatic/manual fan controls. Save and load named operating profiles per miner.
-- Refresh or configure up to 50 selected miners with an individual result for each.
+- Refresh or configure up to 50 selected miners with an individual result for each. Configuration fields show current values, highlight unsaved edits, and send only edited fields for a single miner.
+- Restart an individual miner explicitly from its configuration after saving. Restart commands are audited, serialized with other device work, never automatically retried, and report acknowledgement separately from an observed uptime reset.
 - English and complete Brazilian Portuguese UI, persisted language preference, localized numbers and dates.
 - Three simulated miners with persisted configuration and explicit demo labels. No hardware, pool connection, or Bitcoin mining is performed in demo mode.
 - Local SQLite persistence for readings, events, profiles, and redacted configuration audits.
@@ -83,7 +84,7 @@ The adapter verifies external responses at runtime and detects optional capabili
 
 Official AxeOS is supported through the reviewed API contract, including legacy flat primary-pool fields and modern primary pool slots. Read-only monitoring and capability detection were **validated on a physical Starminer 601** on 2026-10-14 (reported model GammaV2, board 601a-4, firmware V1.0.1-rc.10), including registration and local metric persistence. The owner reported working manual frequency, voltage and fan changes on 2026-10-14; automatic tuning and restoration have not been independently validated on hardware. A version or model name alone does not guarantee compatibility. See [API evidence and implementation decisions](docs/IMPLEMENTATION.md) for the inspected sources and limitations. When reporting a problem, include model/board and firmware versions, sanitized field names, and the failed action. Never upload passwords or full device dumps containing secrets.
 
-Results distinguish **verified**, **not verified**, **unknown outcome**, and **failed**. Verification proves that the device reports the requested public values; it does not prove sustained hashrate, safety, stability, actual payout, or that a firmware restart is unnecessary. Acknowledged writes that do not appear in the subsequent response remain unverified. If a request times out, it is not retried automatically. Check AxeOS before sending it again. Some firmware may require a later restart, which this version does not initiate.
+Results distinguish **verified**, **not verified**, **unknown outcome**, and **failed**. Verification proves that the device reports the requested public values; it does not prove sustained hashrate, safety, stability, actual payout, or that a firmware restart is unnecessary. Acknowledged writes that do not appear in the subsequent response remain unverified. If a request times out, it is not retried automatically. Check AxeOS before sending it again. Some firmware may require a later restart; use the explicit Restart miner button after saving.
 
 Modern pool edits preserve the active primary slot's validated fields and existing password when left blank. Other pool slots are not modified. Only supported settings are exposed: BitHive never disables thermal protections or changes firmware. API read access to a field is not proof of write capability; unsupported writes are detected through failure/readback.
 
@@ -194,6 +195,32 @@ When `actualFrequency` is missing, Start tuning reports that specific field and 
 
 ### Primary and fallback pool profiles
 
-In **Pool profiles**, choose **Pool to copy → Primary pool / Fallback pool** before choosing a Bitaxe. Both sources save the same portable address/port/user profile. In miner configuration, **Load pool profile** fills the primary draft and **Load fallback pool profile** fills the fallback draft. Review the worker and password, then **Apply & verify**. Passwords are not saved in profiles.
+In **Pool profiles**, choose **Pool to copy → Primary pool / Fallback pool** before choosing a Bitaxe. Both sources save the same portable address/port/account profile; the copied suffix after the last dot is treated as a worker and removed. In miner configuration, **Load pool profile** fills the primary draft and **Load fallback pool profile** fills the fallback draft. Review the generated worker and password, then **Apply & verify**. Passwords are not saved in profiles.
 
 Legacy fallback fields and distinct reported secondary slots are supported; slot writes preserve validated connection metadata and passwords when omitted. A missing, unknown or aliased fallback slot leaves fallback controls disabled. BitHive does not select new slot indexes, enable forced fallback, or switch active pools. Verification confirms reported configuration, not a successful failover. Custom Starminer fallback writes still need independent physical validation; development tests use fixtures and simulated miners only.
+
+### Saving settings and restarting
+
+Configuration controls are prefilled from the latest reading. An amber border and unsaved-field count mark edits; reverting a value clears its mark. **Discard edits** restores the current reading. Background refreshes update untouched fields and preserve edits. Passwords remain blank because AxeOS does not return them; a blank password preserves the current secret.
+
+**Apply & verify** sends edited settings and checks readback. A verified configuration does not prove that settings are active on firmware requiring a reboot. After saving, use **Restart miner** for the miner whose details are open. Save or discard edits first. Restart pauses mining briefly, is blocked during an active tuning run, and has a persisted 30-second cooldown to prevent duplicate commands. An acknowledgement means the command was received; BitHive reports an observed restart only after a lower uptime reading. Lost acknowledgements remain uncertain and are never automatically retried.
+
+Restart uses the official `POST /api/system/restart` route with both JSON and legacy plain-text acknowledgements. Custom Starminer restart compatibility still requires independent physical validation; development tests use simulated miners and fixtures.
+
+### Worker names in pool profiles
+
+Profiles store **Payout address / account (without worker)**. When copying a Bitaxe’s primary or fallback configuration, the suffix after the last dot is removed; review the resulting account, especially when the account itself contains dots. Dotted account names entered in the new account field are preserved exactly on subsequent saves.
+
+Loading a profile derives the worker from the miner’s reported AxeOS hostname, lowercased with all whitespace removed: `Living Room AXE` becomes `livingroomaxe`, producing `account.livingroomaxe`. The generated username is read-only while that profile is selected. Clearing the profile selection returns to manual username editing. The local BitHive display label is never used; an absent AxeOS hostname blocks profile loading.
+
+For selected batches, each miner’s username is resolved from a fresh AxeOS reading inside its existing serialized configuration workflow. The frontend sends account bases rather than copying the focused miner’s worker to other miners. Primary and fallback workers follow the same rule. A miner with no hostname is rejected individually without a configuration write.
+
+Legacy stored profiles are read as account-only profiles by removing their last worker suffix. Reading does not modify those stored payloads; saving again writes the new account-only format. No database migration or miner reconfiguration is performed automatically.
+
+Fleet contains fleet dashboards and batch configuration. Open a miner for its own dashboard and controls; configuration and autotuning start closed and load on demand. Activity lets you choose a miner, category and time range, with 20 audit entries per page. Charts start with one hour and one metric.
+
+Reorder Your miners using the grip beside each row (drag, touch, or focus the grip and press Up/Down). The order is stored in this browser and survives fleet polling and reloads. With a status filter active, hidden miners retain their positions.
+
+Miner details show status, hashrate (including firmware averages), power, efficiency, chip/VRM temperatures and hash errors first; input voltage and last update follow with hardware facts. Temperature colors interpolate between display reference anchors: chip 40/55/65/75°C and VRM 45/65/85/105°C (low/mid/high/danger). The danger anchors reference upstream ESP-Miner THROTTLE_TEMP and TPS546_THROTTLE_TEMP in `main/tasks/power_management_task.c`; intermediate anchors are UI reference choices, not firmware-reported limits. Firmware variants may differ. No device protection or tuner setting changes. Missing/negative temperature readings are neutral; stale temperatures are desaturated and marked with a dashed border.
+
+Miner details show live fan duty (`fanspeed`, 0–100%) together with RPM. This comes from firmware telemetry, including automatic cooling; the saved manual fan setting is never substituted. Missing or invalid duty readings show “—”.

@@ -19,10 +19,10 @@ function adapterFor(raw: unknown) {
 }
 describe('fallback pool adapters and portable profiles', () => {
   it('copies a fallback as a portable profile, maps it to either destination and omits secrets', () => {
-    const portable = { stratumURL: 'backup.example.com', stratumPort: 4444, stratumUser: 'backup.worker' };
+    const portable = { stratumURL: 'backup.example.com', stratumPort: 4444, stratumAccount: 'backup' };
     expect(poolSettingsFrom({ ...primary, ...fallback, fallbackStratumPassword: 'never-store' }, 'fallback')).toEqual(portable);
-    expect(poolSettingsFor(portable, 'fallback')).toEqual(fallback);
-    expect(poolSettingsFor(portable, 'primary')).toEqual(portable);
+    expect(poolSettingsFor(portable, 'fallback', 'Worker')).toEqual(fallback);
+    expect(poolSettingsFor(portable, 'primary', 'Worker')).toEqual({ stratumURL: portable.stratumURL, stratumPort: portable.stratumPort, stratumUser: 'backup.worker' });
     expect(poolSettingsFrom(primary, 'fallback')).toBeNull();
   });
   it('normalizes and writes the verified legacy fallback format without changing primary', async () => {

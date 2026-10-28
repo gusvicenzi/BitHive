@@ -1,0 +1,60 @@
+// @vitest-environment jsdom
+import { afterEach, expect, it, vi } from 'vitest';
+import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import '@testing-library/jest-dom/vitest';
+import '../src/web/i18n';
+import { Configuration } from '../src/web/Configuration';
+import { RestartMiner } from '../src/web/RestartMiner';
+import { DemoAdapter } from '../src/server/demo';
+import type { DeviceView } from '../src/shared/domain';
+afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
+const response = (data: unknown) => Promise.resolve({ ok: true, json: async () => data });
+async function miner(): Promise<DeviceView> { return { id: 'a', name: 'Gamma', address: 'demo-1', demo: true, status: 'online', lastSeen: new Date().toISOString(), snapshot: (await new DemoAdapter().read('demo-1')).snapshot }; }
+it('prefills current values, marks changes, removes the mark on revert, and keeps edits across polling', async () => {
+  vi.stubGlobal('fetch', vi.fn(() => response([])));
+  const device = await miner();
+  const { rerender } = render(<Configuration device={device} count={1} busy={false} onApply={vi.fn()} />);
+  const host = screen.getByLabelText('Pool hostname');
+  expect(host).toHaveValue('pool.example.com'); expect(host).not.toHaveClass('is-dirty');
+  expect(screen.getByLabelText('Pool password')).toHaveValue('');
+  await userEvent.clear(host); await userEvent.type(host, 'new.example.com');
+  expect(host).toHaveClass('is-dirty'); expect(screen.getByText('1 unsaved field')).toBeVisible();
+  expect(screen.getByRole('button', { name: 'Restart miner' })).toBeDisabled();
+  const updated = { ...device, snapshot: { ...device.snapshot!, settings: { ...device.snapshot!.settings, stratumPort: 5555 } } };
+  rerender(<Configuration device={updated} count={1} busy={false} onApply={vi.fn()} />);
+  expect(host).toHaveValue('new.example.com'); expect(screen.getByLabelText('Pool port')).toHaveValue(5555);
+  await userEvent.clear(host); await userEvent.type(host, 'pool.example.com');
+  expect(host).not.toHaveClass('is-dirty'); expect(screen.getByRole('button', { name: 'Apply & verify' })).toBeDisabled();
+});
+it('keeps the dirty mark while saving and retains a rejected draft', async () => {
+  vi.stubGlobal('fetch', vi.fn(() => response([])));
+  const device = await miner();
+  let finish!: (result: { id: string; result: 'rejected' }[]) => void;
+  const apply = vi.fn(() => new Promise<{ id: string; result: 'rejected' }[]>(resolve => { finish = resolve; }));
+  render(<Configuration device={device} count={1} busy={false} onApply={apply} />);
+  const host = screen.getByLabelText('Pool hostname');
+  await userEvent.clear(host); await userEvent.type(host, 'new.example.com');
+  await userEvent.click(screen.getByRole('button', { name: 'Apply & verify' }));
+  expect(host).toHaveClass('is-dirty'); expect(host).toBeDisabled();
+  finish([{ id: 'a', result: 'rejected' }]);
+  await waitFor(() => expect(host).toBeEnabled());
+  expect(host).toHaveClass('is-dirty'); expect(host).toHaveValue('new.example.com');
+  await userEvent.click(screen.getByRole('button', { name: 'Discard edits' }));
+  expect(host).toHaveValue('pool.example.com'); expect(host).not.toHaveClass('is-dirty');
+});
+it('sends restart once, preserves acknowledged outcomes if refresh fails and observes a subsequent uptime reset', async () => {
+  const device = await miner(); device.snapshot!.uptime = 500;
+  const fetch = vi.fn(() => response({ id: 'a', result: 'acknowledged', reachable: true }));
+  vi.stubGlobal('fetch', fetch);
+  const onUpdated = vi.fn().mockRejectedValue(new Error('refresh failed'));
+  const { rerender } = render(<RestartMiner device={device} disabled={false} unsaved={false} onUpdated={onUpdated} />);
+  await userEvent.click(screen.getByRole('button', { name: 'Restart miner' }));
+  expect(await screen.findByRole('status')).toHaveTextContent('Restart requested');
+  expect(screen.getByRole('button', { name: 'Restart miner' })).toBeDisabled();
+  expect(fetch).toHaveBeenCalledTimes(1);
+  expect(fetch.mock.calls[0]).toEqual(['/api/devices/a/restart', expect.objectContaining({ method: 'POST' })]);
+  rerender(<RestartMiner device={{ ...device, snapshot: { ...device.snapshot!, uptime: 1 } }} disabled={false} unsaved={false} />);
+  expect(await screen.findByRole('status')).toHaveTextContent('A restart was observed');
+  expect(fetch).toHaveBeenCalledTimes(1);
+});

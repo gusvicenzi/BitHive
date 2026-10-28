@@ -83,7 +83,7 @@ As respostas dos mineradores são validadas durante a execução e as capacidade
 
 O AxeOS oficial é atendido pelo contrato de API revisado, incluindo campos antigos de pool principal e slots modernos. O monitoramento e a detecção de capacidades foram **validados em um Starminer 601 físico** em 14/10/2026 (modelo informado GammaV2, placa 601a-4, firmware V1.0.1-rc.10), incluindo cadastro e persistência local das métricas. O proprietário relatou alterações manuais de frequência, tensão e ventoinha funcionando em 14/10/2026; o ajuste automático e a restauração ainda exigem testes físicos supervisionados. Nome de modelo ou versão não garante compatibilidade. Consulte [evidências da API e decisões de implementação](docs/IMPLEMENTATION.md), em inglês. Para relatar problemas, informe placa/modelo, versão, nomes de campos sem segredos e ação que falhou. Não publique senhas nem respostas integrais contendo credenciais.
 
-Resultados distinguem **verificado**, **não verificado**, **resultado incerto** e **falhou**. A verificação confirma os valores públicos relatados pelo firmware; não comprova desempenho prolongado, estabilidade, segurança, pagamento ou ausência de necessidade de reinício. Alterações aceitas que não aparecem na releitura continuam não verificadas. Comandos com resultado incerto nunca são repetidos automaticamente. Verifique o estado no AxeOS antes de reenviar. Esta versão não reinicia o aparelho.
+Resultados distinguem **verificado**, **não verificado**, **resultado incerto** e **falhou**. A verificação confirma os valores públicos relatados pelo firmware; não comprova desempenho prolongado, estabilidade, segurança, pagamento ou ausência de necessidade de reinício. Alterações aceitas que não aparecem na releitura continuam não verificadas. Comandos com resultado incerto nunca são repetidos automaticamente. Verifique o estado no AxeOS antes de reenviar. Quando o firmware exigir, use Reiniciar miner após salvar as alterações.
 
 Em firmware com slots, apenas o principal ativo é atualizado, preservando seus campos validados e usando o marcador de preservação da senha do firmware quando ela fica vazia. Outros slots não são alterados. O BitHive não desativa proteções térmicas nem altera firmware. Campos legíveis são candidatos a configuração; o suporte real de escrita é confirmado pelo resultado e pela releitura.
 
@@ -195,3 +195,29 @@ Na configuração de um miner, em **Pool e pagamentos**, escolha **Carregar perf
 Em **Perfis de pool**, escolha **Pool para copiar → Pool principal / Pool de fallback** e selecione uma Bitaxe. O perfil salvo pode ser usado em qualquer um dos destinos. Na configuração do miner, use **Carregar perfil de pool** para o principal ou **Carregar perfil no fallback** para o reserva. Revise o worker e a senha e clique em **Aplicar e verificar**. Senhas não são salvas nos perfis.
 
 O fallback funciona com os campos antigos da API ou com um slot secundário distinto informado pelo firmware. Quando indisponível ou ambíguo, os controles ficam desabilitados. A aplicação preserva o pool principal quando apenas o fallback é alterado; não muda índices de slots, não força fallback nem troca o pool ativo. A verificação confirma a configuração lida, não testa uma falha real do pool. A escrita de fallback no firmware Starminer personalizado ainda requer validação física independente; os testes de desenvolvimento usam fixtures e miners simulados.
+
+### Edições e reinicialização do miner
+
+Os campos da configuração mostram os valores da última leitura. Uma borda âmbar e a contagem de campos não salvos indicam edições. Reverter um valor remove a marcação; **Descartar edições** restaura a leitura atual. Atualizações em segundo plano preservam as edições e atualizam campos intocados. Senhas ficam vazias porque o AxeOS não as retorna; deixar a senha vazia preserva a atual.
+
+**Aplicar e verificar** envia os valores editados e confere a leitura. Quando o firmware exigir uma reinicialização para ativar os ajustes salvos, use **Reiniciar miner** na configuração do dispositivo aberto. Salve ou descarte edições primeiro. A reinicialização interrompe brevemente a mineração, é bloqueada durante um ajuste automático ativo e tem intervalo de 30 segundos entre solicitações. O recebimento do comando não confirma a conclusão; o BitHive só informa uma reinicialização observada após ler um tempo de atividade menor. Comandos com resultado desconhecido não são repetidos automaticamente.
+
+A compatibilidade de reinicialização com o firmware Starminer personalizado ainda exige validação física independente. Os testes de desenvolvimento usam fixtures e miners simulados.
+
+### Workers nos perfis de pool
+
+Os perfis salvam **Endereço de pagamento / conta (sem worker)**. Ao copiar o pool principal ou de fallback de uma Bitaxe, o sufixo após o último ponto é removido; revise a conta, especialmente quando ela contém pontos. Contas com pontos digitadas no novo campo são preservadas nos próximos salvamentos.
+
+Ao carregar o perfil, o worker vem do hostname informado pelo AxeOS, em minúsculas e sem espaços: `Living Room AXE` vira `livingroomaxe`, gerando `conta.livingroomaxe`. O usuário gerado fica somente para leitura enquanto o perfil estiver selecionado. Limpe a seleção do perfil para editar o usuário manualmente. O nome de exibição local do BitHive não é usado; sem hostname no AxeOS, o carregamento do perfil fica bloqueado.
+
+Em lotes, o usuário de cada miner é gerado a partir de uma leitura atual do AxeOS, dentro do fluxo de configuração serializado. O worker do miner aberto não é copiado aos demais. A mesma regra vale para o pool principal e o fallback. Miners sem hostname são rejeitados individualmente, sem gravação.
+
+Perfis antigos são lidos sem o último sufixo de worker, preservando os dados armazenados até um novo salvamento no formato de conta sem worker. Não há migração do banco nem reconfiguração automática dos miners.
+
+A Frota reúne os painéis da frota e a configuração em lote. Abra um minerador para acessar seu painel e controles; configuração e ajuste automático começam fechados e carregam sob demanda. Em Atividade, escolha minerador, categoria e período, com 20 registros por página. Os gráficos começam com uma hora e uma métrica.
+
+Reordene Seus mineradores pela alça ao lado de cada linha (arraste, toque ou use as setas para cima/baixo com a alça em foco). A ordem é salva neste navegador e mantida nas atualizações da frota e ao recarregar. Com filtro de status ativo, os mineradores ocultos mantêm suas posições.
+
+Os detalhes mostram primeiro status, hashrate (incluindo médias do firmware), potência, eficiência, temperaturas do chip/VRM e erros de hash; tensão de entrada e última atualização vêm em seguida com os dados de hardware. As cores interpolam entre referências visuais: chip 40/55/65/75°C e VRM 45/65/85/105°C (baixa/média/alta/perigo). Os pontos de perigo usam como referência THROTTLE_TEMP e TPS546_THROTTLE_TEMP do ESP-Miner em `main/tasks/power_management_task.c`; os pontos intermediários são escolhas visuais, não limites informados pelo firmware. Variantes podem diferir. Nenhuma proteção ou ajuste do minerador é alterado. Temperaturas ausentes/negativas ficam neutras; leituras desatualizadas usam cores suaves e borda tracejada.
+
+Os detalhes mostram a porcentagem atual da ventoinha (`fanspeed`, 0–100%) junto com o RPM. O valor vem da telemetria do firmware, inclusive em modo automático; a configuração manual salva nunca é usada como substituta. Leituras ausentes ou inválidas mostram “—”.

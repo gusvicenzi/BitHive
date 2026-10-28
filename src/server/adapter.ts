@@ -10,7 +10,7 @@ const s = z.string().max(255).optional();
 export const infoSchema = z.object({
   ASICModel: s, deviceModel: s, boardVersion: s, version: s, axeOSVersion: s, macAddr: s, hostname: s,
   hashRate: n, hashRate_1m: n, hashRate_10m: n, hashRate_1h: n, power: n, voltage: n, temp: n, vrTemp: n, errorPercentage: n, sharesAccepted: n, sharesRejected: n,
-  uptimeSeconds: n, fanrpm: n, bestDiff: z.union([z.string().max(64), z.number().finite()]).optional(),
+  uptimeSeconds: n, fanrpm: n, fanspeed: z.number().finite().min(0).max(100).optional().catch(undefined), bestDiff: z.union([z.string().max(64), z.number().finite()]).optional(),
   expectedHashrate: n, actualFrequency: n, overheat_mode: n, miningPaused: z.boolean().optional(),
   resetReason: s, hardware_fault: s, power_fault: s,
   frequency: n, coreVoltage: n, autofanspeed: n, manualFanSpeed: n,
@@ -30,6 +30,7 @@ type Info = z.infer<typeof infoSchema>;
 export interface Reading { snapshot: Snapshot; raw: Info }
 export interface MinerAdapter {
   stableAddress?(address: string): Promise<string>;
+  restart?(address: string): Promise<void>;
   read(address: string): Promise<Reading>;
   patchTuning?(address: string, settings: TuningProfile, reading: Reading): Promise<void>;
   patch(address: string, settings: Settings, reading: Reading, customValuesAcknowledged?: boolean): Promise<void>;
@@ -74,7 +75,7 @@ export function normalize(info: Info, asic?: z.infer<typeof asicSchema>): Snapsh
     hardwareFault: Boolean(info.hardware_fault || info.power_fault || info.miningPaused), resetReason: info.resetReason,
     hashRate: info.hashRate, hashRate_1m: info.hashRate_1m, hashRate_10m: info.hashRate_10m, hashRate_1h: info.hashRate_1h, power: info.power, temp: info.temp, vrTemp: info.vrTemp,
     errorRate: info.errorPercentage, accepted: info.sharesAccepted, rejected: info.sharesRejected,
-    uptime: info.uptimeSeconds, fanRpm: info.fanrpm, bestDiff: info.bestDiff?.toString(), settings,
+    uptime: info.uptimeSeconds, fanRpm: info.fanrpm, fanPercent: info.fanspeed, bestDiff: info.bestDiff?.toString(), settings,
     capabilities: { frequencies: asic?.frequencyOptions ?? [], voltages: asic?.voltageOptions ?? [], writable, poolMode, fallbackPoolMode },
   };
 }
@@ -96,6 +97,7 @@ export function validateCapabilities(settings: Settings, snapshot: Snapshot, cus
 export class AxeAdapter implements MinerAdapter {
   constructor(private send: Transport = transport) {}
   stableAddress(address: string) { return resolveAddress(address); }
+  async restart(address: string) { await this.send(address, '/api/system/restart', 'POST'); }
   async read(address: string): Promise<Reading> {
     const parsed = infoSchema.safeParse(await this.send(address, '/api/system/info'));
     if (!parsed.success) throw new AppError('invalidDeviceResponse');

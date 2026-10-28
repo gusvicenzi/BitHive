@@ -1,0 +1,48 @@
+import { expect, test } from '@playwright/test';
+test('drag miners, retain selection, and persist through reload and refresh', async ({ page }) => {
+  const writes: string[] = []; let reads = 0;
+  page.on('request', request => { if (request.method() === 'POST') writes.push(request.url()); if (request.url().endsWith('/api/devices')) reads++; });
+  await page.route('**/api/devices', route => route.fulfill({ json: ['a', 'b', 'c'].map(id => ({ id, name: `Miner ${id}`, address: `demo-${id}`, status: 'online', demo: true })) }));
+  await page.goto('/');
+  const rows = page.locator('tbody tr .device-link');
+  await expect(rows).toHaveText(['Miner a', 'Miner b', 'Miner c']);
+  await page.getByLabel('Select Miner a', { exact: true }).check();
+  const source = (await page.getByRole('button', { name: 'Reorder Miner a', exact: true }).boundingBox())!;
+  const target = (await page.getByRole('button', { name: 'Miner c', exact: true }).boundingBox())!;
+  await page.mouse.move(source.x + 10, source.y + 10); await page.mouse.down();
+  await page.mouse.move(target.x + 10, target.y + 10, { steps: 12 }); await page.mouse.up();
+  await expect(rows).toHaveText(['Miner b', 'Miner c', 'Miner a']);
+  await expect(page.getByLabel('Select Miner a', { exact: true })).toBeChecked();
+  await page.reload();
+  await expect(rows).toHaveText(['Miner b', 'Miner c', 'Miner a']);
+  await page.getByRole('button', { name: 'Reorder Miner a', exact: true }).focus();
+  await page.keyboard.press('ArrowUp');
+  await expect(rows).toHaveText(['Miner b', 'Miner a', 'Miner c']);
+  await page.screenshot({ path: 'test-results/miner-order-desktop.png', fullPage: true });
+  // The normal ten-second fleet poll must retain the user's order.
+  const previousReads = reads;
+  await expect.poll(() => reads, { timeout: 15000 }).toBeGreaterThan(previousReads);
+  await expect(rows).toHaveText(['Miner b', 'Miner a', 'Miner c']);
+  await page.reload();
+  await expect(rows).toHaveText(['Miner b', 'Miner a', 'Miner c']);
+  expect(writes).toEqual([]);
+});
+test('touch drag on mobile moves a row without opening a miner', async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+  const page = await context.newPage();
+  await page.route('**/api/devices', route => route.fulfill({ json: ['a', 'b', 'c'].map(id => ({ id, name: `Miner ${id}`, address: id, status: 'online', demo: false })) }));
+  await page.goto('http://localhost:3081');
+  const handle = page.getByRole('button', { name: 'Reorder Miner c', exact: true });
+  await handle.scrollIntoViewIfNeeded();
+  const source = (await handle.boundingBox())!;
+  const target = (await page.getByRole('button', { name: 'Reorder Miner a', exact: true }).boundingBox())!;
+  const client = await context.newCDPSession(page);
+  await client.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: source.x + source.width / 2, y: source.y + source.height / 2 }] });
+  await client.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: target.x + target.width / 2, y: target.y + target.height / 2 }] });
+  await client.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await expect(page.locator('tbody tr .device-link')).toHaveText(['Miner c', 'Miner a', 'Miner b']);
+  await expect(page).not.toHaveURL(/#miner\//);
+  await page.screenshot({ path: 'test-results/miner-order-mobile.png', fullPage: true });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await context.close();
+});

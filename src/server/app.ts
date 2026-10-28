@@ -1,4 +1,6 @@
 import Fastify from 'fastify';
+import { metricHistory, historyBucketMinutes } from './metric-history.js';
+import { poolAccountsSchema } from '../shared/pool-profiles.js';
 import { registerPoolProfileRoutes } from './pool-profile-routes.js';
 import staticFiles from '@fastify/static';
 import { z, ZodError } from 'zod';
@@ -45,6 +47,11 @@ export async function createApp(db: PrismaClient, options: { service?: FleetServ
     return reply.code(201).send(await service.register(body.address, body.name));
   });
   app.post('/api/demo', () => service.enableDemo());
+  app.post('/api/devices/:id/restart', req => {
+    const { id } = z.object({ id: z.string().min(1).max(64) }).strict().parse(req.params);
+    z.object({}).strict().parse(req.body);
+    return service.restart(id);
+  });
   app.post('/api/devices/:id/name', async req => {
     const { id } = z.object({ id: z.string().min(1).max(64) }).parse(req.params);
     const { name } = z.object({ name: displayNameSchema }).strict().parse(req.body);
@@ -70,22 +77,27 @@ export async function createApp(db: PrismaClient, options: { service?: FleetServ
   });
   app.post('/api/batch', req => {
     const body = z.object({ ids: z.array(z.string().min(1).max(64)).min(1).max(50).refine(ids => new Set(ids).size === ids.length),
-      action: z.enum(['refresh', 'configure']), settings: settingsSchema.optional(), customValuesAcknowledged: z.boolean().optional() }).strict()
-      .refine(v => v.action !== 'configure' || v.settings !== undefined)
+      action: z.enum(['refresh', 'configure']), settings: settingsSchema.optional(), poolAccounts: poolAccountsSchema.optional(), customValuesAcknowledged: z.boolean().optional() }).strict()
+      .refine(v => v.action !== 'configure' || v.settings !== undefined || v.poolAccounts !== undefined)
+      .refine(v => v.action === 'configure' || v.poolAccounts === undefined)
+      .refine(v => !v.poolAccounts || (v.settings?.hostname === undefined && (v.poolAccounts.primary === undefined || v.settings?.stratumUser === undefined) && (v.poolAccounts.fallback === undefined || v.settings?.fallbackStratumUser === undefined)))
       .refine(v => v.settings?.hostname === undefined || v.ids.length === 1).parse(req.body);
-    return service.batch(body.ids, body.action, body.settings, body.customValuesAcknowledged);
+    return service.batch(body.ids, body.action, body.settings, body.customValuesAcknowledged, body.poolAccounts);
   });
   app.get('/api/devices/:id/history', async req => {
     const { id } = z.object({ id: z.string().min(1).max(64) }).parse(req.params);
-    const { hours } = z.object({ hours: z.coerce.number().int().min(1).max(720).default(24) }).parse(req.query);
+    const { hours, section, offset, pageSize } = z.object({ hours: z.coerce.number().int().min(1).max(720).default(24),
+      section: z.enum(['all', 'metrics', 'events', 'changes']).default('all'),
+      offset: z.coerce.number().int().min(0).max(100000).default(0), pageSize: z.coerce.number().int().min(1).max(100).default(20),
+    }).parse(req.query);
     if (!await db.device.findUnique({ where: { id } })) throw new AppError('notFound', 404);
     const since = new Date(Date.now() - hours * 3600000);
     const [metrics, events, changes] = await Promise.all([
-      db.metric.findMany({ where: { deviceId: id, timestamp: { gte: since } }, orderBy: { timestamp: 'desc' }, take: 1000 }),
-      db.event.findMany({ where: { deviceId: id }, orderBy: { timestamp: 'desc' }, take: 100 }),
-      db.configChange.findMany({ where: { deviceId: id }, orderBy: { timestamp: 'desc' }, take: 100 }),
+      section === 'all' || section === 'metrics' ? metricHistory(db, id, hours).then(result => result.metrics) : [],
+      section === 'all' || section === 'events' ? db.event.findMany({ where: { deviceId: id, timestamp: { gte: since } }, orderBy: [{ timestamp: 'desc' }, { id: 'desc' }], skip: offset, take: section === 'all' ? 100 : pageSize + 1 }) : [],
+      section === 'all' || section === 'changes' ? db.configChange.findMany({ where: { deviceId: id, timestamp: { gte: since } }, orderBy: [{ timestamp: 'desc' }, { id: 'desc' }], skip: offset, take: section === 'all' ? 100 : pageSize + 1 }) : [],
     ]);
-    return { metrics: metrics.reverse(), events, changes, limit: 1000 };
+    return { metrics, bucketMinutes: historyBucketMinutes(hours), events: section === 'all' ? events : events.slice(0, pageSize), changes: section === 'all' ? changes : changes.slice(0, pageSize), limit: 1000, hasMore: section === 'events' ? events.length > pageSize : section === 'changes' ? changes.length > pageSize : false };
   });
   if (options.webRoot) {
     await app.register(staticFiles, { root: options.webRoot });

@@ -4,6 +4,8 @@ test('demo tuning setup, persistent progress, pause/resume, confirmation and res
   test.setTimeout(120000);
   await page.goto('/'); await page.getByRole('button', { name: 'Try demo' }).first().click();
   await page.getByRole('button', { name: 'Bitaxe 2', exact: true }).click();
+  await page.locator('.miner-disclosure > summary').first().click();
+  await page.locator('.miner-disclosure > summary').nth(1).click();
   const tuning = page.getByRole('region', { name: 'Automatic tuning', exact: true });
   for (const [label, value] of Object.entries({
     'Minimum frequency (MHz)': '400', 'Maximum frequency (MHz)': '575', 'Frequency step (MHz)': '25',
@@ -25,7 +27,9 @@ test('demo tuning setup, persistent progress, pause/resume, confirmation and res
   await tuning.screenshot({ path: 'test-results/bithive-tuner-live.png' });
   await tuning.getByRole('button', { name: 'Pause', exact: true }).click();
   await expect(tuning.getByRole('heading', { name: 'Paused', exact: true })).toBeVisible();
-  await page.reload(); await page.getByRole('button', { name: 'Bitaxe 2', exact: true }).click();
+  await page.reload();
+  await page.locator('.miner-disclosure > summary').first().click();
+  await page.locator('.miner-disclosure > summary').nth(1).click();
   await expect(tuning.getByRole('heading', { name: 'Paused', exact: true })).toBeVisible();
   await tuning.getByRole('button', { name: 'Resume', exact: true }).click();
   await expect(tuning.getByRole('heading', { name: 'Completed', exact: true })).toBeVisible({ timeout: 80000 });
@@ -52,6 +56,7 @@ test('demo recovery failure remains prominent with partial results in both langu
   await page.route('**/api/devices/recovery-demo/tuning', r => r.fulfill({ json: [{ id: 'run', deviceId: 'recovery-demo', state, config: { mode: 'fast', expected: { source: 'firmware' }, frequency: { minimum: 400, maximum: 575, step: 25 }, voltage: { minimum: 1100, maximum: 1200, step: 10 }, maxAsicTemperature: 65, maxVrmTemperature: 85, maxErrorPercentage: 2, stabilizationSeconds: 120, measurementSeconds: 300 }, createdAt: new Date().toISOString() }] }));
   await page.route('**/api/devices/recovery-demo/tuning/run/results?*', r => r.fulfill({ json: { attempts: [{ id: 'attempt', kind: 'search', profile: original, outcome: 'invalid', summary: null, reason: 'connectionLoss' }], total: 1, offset: 0, limit: 100 } }));
   await page.goto('/'); await page.getByRole('button', { name: 'Recovery demo', exact: true }).click();
+  await page.locator('.miner-disclosure > summary').nth(1).click();
   const tuning = page.getByRole('region', { name: 'Automatic tuning', exact: true });
   await expect(tuning.getByRole('heading', { name: 'Recovery required' })).toBeVisible();
   await expect(tuning).toContainText('manual recovery required');
@@ -79,6 +84,7 @@ test('live operating window, labeled readings and countdown fit desktop and mobi
   await page.route('**/api/devices/visual-demo/tuning', route => route.fulfill({ json: [run] }));
   await page.route('**/api/devices/visual-demo/tuning/visual-run/results?*', route => route.fulfill({ json: { attempts: [], total: 0, offset: 0, limit: 100 } }));
   await page.goto('/'); await page.getByRole('button', { name: 'Console demo', exact: true }).click();
+  await page.locator('.miner-disclosure > summary').nth(1).click();
   const tuning = page.getByRole('region', { name: 'Automatic tuning', exact: true });
   await expect(tuning.getByRole('heading', { name: 'Measuring', exact: true })).toBeVisible();
   await expect(tuning.getByRole('img')).toHaveAccessibleName(/525 MHz, 1150 mV/);
@@ -105,6 +111,8 @@ test('physical acknowledgement UI gates each run with a demo-backed fixture', as
     return route.continue();
   });
   await page.goto('/'); await page.getByRole('button', { name: 'Bitaxe 3', exact: true }).click();
+  await page.locator('.miner-disclosure > summary').first().click();
+  await page.locator('.miner-disclosure > summary').nth(1).click();
   const tuning = page.getByRole('region', { name: 'Automatic tuning', exact: true });
   const toggle = tuning.getByRole('switch', { name: /I understand the risks/ });
   const start = tuning.getByRole('button', { name: 'Start tuning' });

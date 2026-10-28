@@ -39,6 +39,12 @@ describe('local network transport', () => {
     await expect(transport('192.168.1.5', '/api/system', 'PATCH', { frequency: 525 })).resolves.toBeUndefined();
     expect(requestMock.mock.calls[0][0]).toMatchObject({ method: 'PATCH', headers: { 'Content-Type': 'application/json' } });
   });
+  it.each(['System will restart shortly.', '{"message":"System will restart shortly."}'])('accepts POST restart acknowledgement without requiring JSON: %s', async body => {
+    serve(200, body);
+    await expect(transport('192.168.1.5', '/api/system/restart', 'POST')).resolves.toBeUndefined();
+    expect(requestMock.mock.calls[0][0]).toMatchObject({ method: 'POST', path: '/api/system/restart' });
+    expect(requestMock).toHaveBeenCalledTimes(1);
+  });
   it('rejects redirects and errors without following other hosts', async () => {
     serve(302, ''); await expect(transport('192.168.1.5', '/api/system/info')).rejects.toThrow('deviceRejected');
     serve(404, ''); await expect(transport('192.168.1.5', '/api/system/asic')).rejects.toThrow('unsupported');

@@ -47,6 +47,8 @@ export interface Snapshot {
   rejected?: number;
   uptime?: number;
   fanRpm?: number;
+  /** Live fan duty percentage reported by firmware, independent of the manual setting. */
+  fanPercent?: number;
   bestDiff?: string;
   settings: Omit<Settings, 'stratumPassword' | 'fallbackStratumPassword'>;
   capabilities: { frequencies: number[]; voltages: number[]; writable: (keyof Settings)[]; poolMode: 'legacy' | 'slots' | 'none'; fallbackPoolMode?: 'legacy' | 'slots' | 'none' };
@@ -68,6 +70,7 @@ export interface MetricView {
   vrTemp: number | null;
   errorRate: number | null;
 }
+export type RestartResult = { id: string; result: 'restarted' | 'acknowledged' | 'unknown' | 'rejected'; reachable: boolean };
 export type ActionResult = { id: string; result: 'verified' | 'unverified' | 'unknown' | 'rejected' | 'refreshed'; reason?: string };
 export function efficiency(hashRate?: number | null, power?: number | null) {
   return hashRate != null && hashRate > 0 && power != null ? power * 1000 / hashRate : null;
