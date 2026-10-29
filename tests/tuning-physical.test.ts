@@ -49,7 +49,9 @@ async function until(run: TuningRunView, predicate: (r: TuningRunView) => boolea
 }
 const inSearch = (r: TuningRunView) => r.state.kind === 'search' && r.state.phase === 'measuring';
 
-describe('acknowledged physical tuning through the hardware adapter', () => {
+// Full tuning lifecycles perform many real SQLite transactions. Windows CI
+// needs more headroom than the default 15-second budget; keep ordinary tests bounded.
+describe('acknowledged physical tuning through the hardware adapter', { timeout: 60000 }, () => {
   it('requires strict per-run acknowledgement in the API and persists it without writing at creation', async () => {
     const app = await createApp(fixture.db, { service: fleet, tuner });
     const request = (input: unknown) => app.inject({ method: 'POST', url: `/api/devices/${deviceId}/tuning`,

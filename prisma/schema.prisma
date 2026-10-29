@@ -20,6 +20,8 @@ model Device {
   changes     ConfigChange[]
   profiles    Profile[]
   tuningRuns  TuningRun[]
+  scheduleMembers ScheduleMember[]
+  scheduleExecutions ScheduleExecution[]
   @@index([nextPoll])
 }
 model Profile {
@@ -124,4 +126,50 @@ model TuningCheckpoint {
   status      String
   auditId     Int?
   @@index([runId, timestamp])
+}
+
+model Schedule {
+  id String @id @default(cuid())
+  name String
+  timeZone String
+  points String
+  enabled Boolean @default(false)
+  revision Int @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  members ScheduleMember[]
+  executions ScheduleExecution[]
+}
+model ScheduleMember {
+  id String @id @default(cuid())
+  scheduleId String
+  schedule Schedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+  deviceId String
+  device Device @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  activeDeviceId String? @unique
+  assignments String
+  acknowledgments String @default("{}")
+  overrideUntil DateTime?
+  @@unique([scheduleId, deviceId])
+}
+model ScheduleExecution {
+  id String @id @default(cuid())
+  scheduleId String?
+  schedule Schedule? @relation(fields: [scheduleId], references: [id], onDelete: SetNull)
+  scheduleName String
+  periodName String
+  deviceId String
+  device Device @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  revision Int
+  occurrence String
+  pointId String
+  profileName String
+  settings String
+  status String
+  reason String?
+  attempted Boolean @default(false)
+  timestamp DateTime @default(now())
+  @@unique([scheduleId, deviceId, revision, occurrence])
+  @@index([deviceId, timestamp])
+  @@index([timestamp])
 }

@@ -7,7 +7,15 @@ test('miner details include fleet readings, a prioritized first row and independ
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.goto('/');
   const row = page.locator('tbody tr');
-  await expect(row.locator('.temperature-reading')).toHaveAttribute('data-band', 'high');
+  await expect(row.locator('.temperature-reading')).toHaveCount(2);
+  await expect(row.locator('.temperature-reading').nth(0)).toHaveAttribute('title', /^Chip:/);
+  await expect(row.locator('.temperature-reading').nth(0)).toHaveAttribute('data-band', 'high');
+  await expect(row.locator('.temperature-reading').nth(1)).toHaveAttribute('title', /^VRM:/);
+  await expect(row.locator('.temperature-reading').nth(1)).toHaveAttribute('data-band', 'mid');
+  const bounds = await row.locator('.temperature-reading').evaluateAll(nodes => nodes.map(node => node.getBoundingClientRect().toJSON()));
+  expect(bounds[1].x).toBeGreaterThan(bounds[0].right);
+  expect(bounds[1].y).toBe(bounds[0].y);
+  await page.screenshot({ path: 'test-results/fleet-temperatures-desktop.png', fullPage: true });
   await page.getByRole('button', { name: 'Bitaxe03', exact: true }).click();
   await expect(page.locator('.miner-headline')).toContainText('1.21 TH/s');
   const top = await page.locator('.miner-headline > div').evaluateAll(nodes => nodes.map(node => Math.round(node.getBoundingClientRect().top)));

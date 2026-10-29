@@ -1,3 +1,4 @@
+import { recordManualScheduleOverride } from './schedule-repository.js';
 import type { Device } from '@prisma/client';
 import { grid, profileSchema, tuningConfigSchema, tuningTelemetryFailure, type TuningProfile } from '../shared/tuning.js';
 import type { Reading } from './adapter.js';
@@ -107,7 +108,7 @@ export class FleetService {
       return { id, result, reachable };
     }));
   }
-  async configure(id: string, input: Settings, customValuesAcknowledged = false, accounts?: PoolAccounts): Promise<ActionResult> {
+  async configure(id: string, input: Settings, customValuesAcknowledged = false, accounts?: PoolAccounts, scheduled?: { prepare: (reading: Reading) => Promise<void> }): Promise<ActionResult> {
     const poolAccounts = accounts === undefined ? undefined : poolAccountsSchema.parse(accounts);
     const baseSettings = poolAccounts && !Object.keys(input).length ? {} : settingsSchema.parse(input);
     if (poolAccounts && (baseSettings.hostname !== undefined || (poolAccounts.primary !== undefined && baseSettings.stratumUser !== undefined) || (poolAccounts.fallback !== undefined && baseSettings.fallbackStratumUser !== undefined))) throw new AppError('invalidInput');
@@ -138,6 +139,15 @@ export class FleetService {
         } catch (error) { throw new AppError(error instanceof Error ? error.message : 'poolWorkerInvalid'); }
       }
       validateCapabilities(settings, before.snapshot, customValuesAcknowledged);
+      if (scheduled) {
+        await scheduled.prepare(before);
+        if (Object.entries(settings).every(([key, value]) => before.snapshot.settings[key as keyof typeof before.snapshot.settings] === value)) {
+          await persistReading(this.db, device, before.snapshot);
+          return { id, result: 'verified' };
+        }
+      } else if (['frequency', 'coreVoltage', 'autofanspeed', 'manualFanSpeed'].some(key => key in settings)) {
+        await recordManualScheduleOverride(this.db, id);
+      }
       const { stratumPassword, fallbackStratumPassword, ...publicSettings } = settings;
       const audit = await this.db.configChange.create({ data: { deviceId: id, before: JSON.stringify(before.snapshot.settings),
         requested: JSON.stringify({ ...publicSettings, ...(customValuesAcknowledged ? { customValuesAcknowledged: true } : {}), ...(stratumPassword !== undefined ? { passwordChanged: true } : {}), ...(fallbackStratumPassword !== undefined ? { fallbackPasswordChanged: true } : {}) }), result: 'unknown' } });
@@ -208,6 +218,7 @@ export class FleetService {
       noVoltageIncrease ||= Boolean(fault || hot);
       if (expectedBefore && !Object.entries(expectedBefore).every(([key, value]) => before.snapshot.settings[key as keyof TuningProfile] === value)) throw new AppError('externalChange', 409);
       if (noVoltageIncrease && (before.snapshot.settings.coreVoltage === undefined || profile.coreVoltage > before.snapshot.settings.coreVoltage)) throw new AppError('unsafeRecovery');
+      if (purpose === 'applyWinner') await recordManualScheduleOverride(this.db, id);
       const checkpoint = await this.db.tuningCheckpoint.create({ data: { runId, profile: JSON.stringify(profile), purpose, status: 'intended' } });
       const audit = await this.db.configChange.create({ data: { deviceId: id, before: JSON.stringify(before.snapshot.settings), requested: JSON.stringify({ ...profile, ...(limits.configuredFrequencyAcknowledged === true ? { configuredFrequencyAcknowledged: true } : {}), ...(!device.demo ? { physicalTuningAcknowledged: true } : {}) }), result: 'unknown' } });
       await this.db.tuningCheckpoint.update({ where: { id: checkpoint.id }, data: { auditId: audit.id } });

@@ -27,6 +27,7 @@ export async function retention(db: PrismaClient, now = Date.now()) {
   const cutoff = (days: number) => new Date(now - days * 86400000);
   await db.$transaction([
     db.metric.deleteMany({ where: { timestamp: { lt: cutoff(30) } } }),
+    db.scheduleExecution.deleteMany({ where: { timestamp: { lt: cutoff(90) } } }),
     db.event.deleteMany({ where: { timestamp: { lt: cutoff(90) } } }),
     // Tuning checkpoints keep their command audit evidence independently of
     // ordinary configuration-history retention.

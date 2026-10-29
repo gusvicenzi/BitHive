@@ -31,7 +31,9 @@ async function until(run: TuningRunView, predicate: (r: TuningRunView) => boolea
 }
 const inSearch = (r: TuningRunView) => r.state.kind === 'search' && r.state.phase === 'measuring';
 
-describe('persistent tuning lifecycle', () => {
+// Full tuning lifecycles perform many real SQLite transactions. Windows CI
+// needs more headroom than the default 15-second budget; keep ordinary tests bounded.
+describe('persistent tuning lifecycle', { timeout: 60000 }, () => {
   it('migrates idempotently, preserves runs across connections and isolates results from retention', async () => {
     const run = await create(); fixture.migrate();
     expect((await new Tuner(fleet).get(deviceId, run.id)).config).toEqual(config);

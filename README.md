@@ -232,3 +232,15 @@ The Fleet page groups miners by pool endpoint, port and payout account, independ
 Pool selection uses the read-only `isUsingFallbackStratum` report, including reported primary/secondary slots. Missing selection telemetry and stale/offline readings are labeled configured/last known, with active pool unconfirmed. No pool mode is guessed from a hostname, port, profile name or custom firmware brand.
 
 **Fleet history** offers hour/day/week ranges: summed hashrate and device-reported power, plus chip and VRM temperature overlays with consistent colors per miner. Hover, tap or use arrow keys to inspect a sample. Temperature legend buttons show/hide a miner on both temperature charts without changing totals. Simulated and real histories are separate. Totals sum available bucket averages; tooltips report contributor counts so partial totals are explicit. Missing buckets remain gaps. Miner history also offers **VRM temperature** in **Chart metric**.
+
+## Scheduled operating profiles
+
+Open **Schedules** to build a weekly timetable. Save operating profiles in each miner’s configuration first, then select miners and assign each miner’s own profile to every change point. Profiles contain frequency, core voltage, and fan settings only. A period lasts until the next change, including overnight and across the week. One miner may belong to only one enabled schedule.
+
+New schedules start disabled. Review exact settings before enabling; acknowledge custom frequency/voltage values per miner. Changing assigned settings invalidates that acknowledgment. Enabling or saving an enabled timetable applies the current period on the next scheduler cycle (five seconds, plus device queue/network time). Disabling or deleting leaves miner settings in place.
+
+The BitHive server and its host computer must remain running and awake; browser tabs may be closed. After downtime or reconnection, only the currently relevant profile is applied. Manual operating changes, including explicit application of a tuning winner, override scheduling until the next transition; pool-only edits do not. Active tuning/recovery retains device ownership. Firmware protection and hardware faults block scheduled writes.
+
+Every attempted command is durably claimed before dispatch and is never automatically replayed. Uncertain outcomes are checked through reads only; unresolved uncertainty is visible in the schedule status. Activity → Scheduled profile changes retains schedule, period, profile, and outcome for 90 days, including after schedule deletion.
+
+Each schedule stores its IANA timezone. Repeated daylight-saving times run once at their first occurrence; nonexistent local times move to the first valid instant afterward. Schedules, assignments, acknowledgments, overrides, and execution claims persist through committed database migrations. The schedule APIs are `/api/schedules` (GET/POST), `/:id` (GET/POST update), and `/:id/enable`, `/disable`, `/delete` (POST `{}`). Limits are 100 schedules, 32 change points, and 500 miners per schedule. Incomplete drafts can be saved but cannot be enabled.

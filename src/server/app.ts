@@ -1,3 +1,5 @@
+import { Scheduler } from './scheduler.js';
+import { registerScheduleRoutes } from './schedule-routes.js';
 import Fastify from 'fastify';
 import { fleetMetricHistory, metricHistory, historyBucketMinutes } from './metric-history.js';
 import { poolAccountsSchema } from '../shared/pool-profiles.js';
@@ -11,7 +13,7 @@ import { FleetService } from './service.js';
 import { AppError } from './errors.js';
 import { settingsSchema, addressSchema, displayNameSchema } from '../shared/domain.js';
 
-export async function createApp(db: PrismaClient, options: { service?: FleetService; tuner?: Tuner; webRoot?: string; dev?: boolean } = {}) {
+export async function createApp(db: PrismaClient, options: { service?: FleetService; tuner?: Tuner; scheduler?: Scheduler; webRoot?: string; dev?: boolean } = {}) {
   const app = Fastify({ logger: false, bodyLimit: 16384, requestTimeout: 30000 });
   const service = options.service ?? new FleetService(db);
   app.setErrorHandler((error, _req, reply) => {
@@ -39,6 +41,7 @@ export async function createApp(db: PrismaClient, options: { service?: FleetServ
     return payload;
   });
   registerPoolProfileRoutes(app, db);
+  registerScheduleRoutes(app, options.scheduler ?? new Scheduler(service));
   registerTuningRoutes(app, options.tuner ?? new Tuner(service));
   app.get('/api/health', () => ({ status: 'ok' }));
   app.get('/api/devices', () => service.list());
@@ -91,7 +94,7 @@ export async function createApp(db: PrismaClient, options: { service?: FleetServ
   app.get('/api/devices/:id/history', async req => {
     const { id } = z.object({ id: z.string().min(1).max(64) }).parse(req.params);
     const { hours, section, offset, pageSize } = z.object({ hours: z.coerce.number().int().min(1).max(720).default(24),
-      section: z.enum(['all', 'metrics', 'events', 'changes']).default('all'),
+      section: z.enum(['all', 'metrics', 'events', 'changes', 'schedules']).default('all'),
       offset: z.coerce.number().int().min(0).max(100000).default(0), pageSize: z.coerce.number().int().min(1).max(100).default(20),
     }).parse(req.query);
     if (!await db.device.findUnique({ where: { id } })) throw new AppError('notFound', 404);
@@ -101,7 +104,9 @@ export async function createApp(db: PrismaClient, options: { service?: FleetServ
       section === 'all' || section === 'events' ? db.event.findMany({ where: { deviceId: id, timestamp: { gte: since } }, orderBy: [{ timestamp: 'desc' }, { id: 'desc' }], skip: offset, take: section === 'all' ? 100 : pageSize + 1 }) : [],
       section === 'all' || section === 'changes' ? db.configChange.findMany({ where: { deviceId: id, timestamp: { gte: since } }, orderBy: [{ timestamp: 'desc' }, { id: 'desc' }], skip: offset, take: section === 'all' ? 100 : pageSize + 1 }) : [],
     ]);
-    return { metrics, bucketMinutes: historyBucketMinutes(hours), events: section === 'all' ? events : events.slice(0, pageSize), changes: section === 'all' ? changes : changes.slice(0, pageSize), limit: 1000, hasMore: section === 'events' ? events.length > pageSize : section === 'changes' ? changes.length > pageSize : false };
+    const scheduleChanges = section === 'all' || section === 'schedules' ? await db.scheduleExecution.findMany({ where: { deviceId: id, timestamp: { gte: since } }, orderBy: [{ timestamp: 'desc' }, { id: 'desc' }], skip: offset, take: section === 'all' ? 100 : pageSize + 1 }) : [];
+    return { scheduleChanges: (section === 'all' ? scheduleChanges : scheduleChanges.slice(0, pageSize)).map(change => ({ id: change.id, timestamp: change.timestamp, scheduleName: change.scheduleName,
+      periodName: change.periodName, profileName: change.profileName, status: change.status, reason: change.reason })), metrics, bucketMinutes: historyBucketMinutes(hours), events: section === 'all' ? events : events.slice(0, pageSize), changes: section === 'all' ? changes : changes.slice(0, pageSize), limit: 1000, hasMore: section === 'schedules' ? scheduleChanges.length > pageSize : section === 'events' ? events.length > pageSize : section === 'changes' ? changes.length > pageSize : false };
   });
   if (options.webRoot) {
     await app.register(staticFiles, { root: options.webRoot });
