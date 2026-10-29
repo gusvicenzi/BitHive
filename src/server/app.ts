@@ -1,5 +1,5 @@
 import Fastify from 'fastify';
-import { metricHistory, historyBucketMinutes } from './metric-history.js';
+import { fleetMetricHistory, metricHistory, historyBucketMinutes } from './metric-history.js';
 import { poolAccountsSchema } from '../shared/pool-profiles.js';
 import { registerPoolProfileRoutes } from './pool-profile-routes.js';
 import staticFiles from '@fastify/static';
@@ -42,6 +42,10 @@ export async function createApp(db: PrismaClient, options: { service?: FleetServ
   registerTuningRoutes(app, options.tuner ?? new Tuner(service));
   app.get('/api/health', () => ({ status: 'ok' }));
   app.get('/api/devices', () => service.list());
+  app.get('/api/fleet/history', async req => {
+    const { hours } = z.object({ hours: z.coerce.number().int().min(1).max(720).default(1) }).strict().parse(req.query);
+    return fleetMetricHistory(db, hours);
+  });
   app.post('/api/devices', async (req, reply) => {
     const body = z.object({ address: addressSchema, name: z.string().trim().max(80).optional() }).strict().parse(req.body);
     return reply.code(201).send(await service.register(body.address, body.name));

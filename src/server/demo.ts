@@ -12,7 +12,7 @@ export class DemoAdapter implements MinerAdapter {
     const settings = { frequency: 525, coreVoltage: 1150, autofanspeed: 1, manualFanSpeed: 60, stratumURL: 'pool.example.com', stratumPort: 3333, stratumUser: `demo.worker${index}`, fallbackStratumURL: 'backup.example.com', fallbackStratumPort: 3334, fallbackStratumUser: `demo.backup${index}`, ...this.state.get(address) };
     const wave = Math.sin(Date.now() / 18000 + index);
     const raw = infoSchema.parse({
-      ...settings, ASICModel: index === 3 ? 'BM1366' : 'BM1370', deviceModel: index === 1 ? 'Starminer 601' : index === 3 ? 'Ultra' : 'Gamma',
+      ...settings, isUsingFallbackStratum: 0, ASICModel: index === 3 ? 'BM1366' : 'BM1370', deviceModel: index === 1 ? 'Starminer 601' : index === 3 ? 'Ultra' : 'Gamma',
       version: 'demo-0.1', boardVersion: index === 3 ? '401' : '601', macAddr: `02:00:00:00:00:0${index}`, hostname: settings.hostname ?? address,
       hashRate: (index === 3 ? 520 : 1200) * (settings.frequency ?? 525) / 525 + wave * 32,
       voltage: 5100 + index * 10,

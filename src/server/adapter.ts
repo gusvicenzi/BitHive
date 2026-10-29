@@ -15,6 +15,7 @@ export const infoSchema = z.object({
   resetReason: s, hardware_fault: s, power_fault: s,
   frequency: n, coreVoltage: n, autofanspeed: n, manualFanSpeed: n,
   stratumURL: s, stratumPort: n, stratumUser: s, primaryPoolIndex: n, secondaryPoolIndex: n,
+  isUsingFallbackStratum: z.union([z.literal(0), z.literal(1), z.boolean()]).optional().catch(undefined),
   fallbackStratumURL: s, fallbackStratumPort: n, fallbackStratumUser: s,
   pools: z.array(z.object({ id: z.number().int().min(0).max(7), stratumURL: z.string().max(255),
     stratumPort: z.number().int().min(1).max(65535), stratumUser: z.string().max(255),
@@ -70,6 +71,7 @@ export function normalize(info: Info, asic?: z.infer<typeof asicSchema>): Snapsh
     firmware: info.version ?? info.axeOSVersion, mac: info.macAddr, hostname: info.hostname,
     // AxeOS reports supply voltage in millivolts; snapshots use volts.
     inputVoltage: info.voltage === undefined ? undefined : info.voltage / 1000,
+    isUsingFallbackStratum: info.isUsingFallbackStratum === undefined ? undefined : Boolean(info.isUsingFallbackStratum),
     expectedHashrate: info.expectedHashrate, actualFrequency: info.actualFrequency,
     firmwareProtection: info.overheat_mode === undefined ? undefined : info.overheat_mode !== 0,
     hardwareFault: Boolean(info.hardware_fault || info.power_fault || info.miningPaused), resetReason: info.resetReason,

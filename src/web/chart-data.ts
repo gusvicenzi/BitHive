@@ -5,8 +5,8 @@ export function hashRateScale(values: number[]) {
 export function valueScale(values: number[]) {
   const finite = values.filter(Number.isFinite);
   if (!finite.length) return { min: 0, max: 1, step: 0.25, ticks: [0, 0.25, 0.5, 0.75, 1] };
-  const minimum = Math.min(...finite);
-  const maximum = Math.max(...finite);
+  const minimum = finite.reduce((minimum, value) => Math.min(minimum, value), Infinity);
+  const maximum = finite.reduce((maximum, value) => Math.max(maximum, value), -Infinity);
   const low = minimum >= 0 ? Math.max(0, minimum * 0.9) : minimum * 1.1;
   const high = maximum > 0 ? maximum * 1.08 : maximum < 0 ? maximum * 0.9 : 1;
   const target = (high - low) / 4;

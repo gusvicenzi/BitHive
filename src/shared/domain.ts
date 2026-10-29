@@ -27,6 +27,8 @@ export interface Snapshot {
   firmware?: string;
   mac?: string;
   hostname?: string;
+  /** Reported live pool selection; absent means firmware did not report it. */
+  isUsingFallbackStratum?: boolean;
   expectedHashrate?: number;
   actualFrequency?: number;
   hardwareFault?: boolean;

@@ -7,7 +7,7 @@ type History = { bucketMinutes?: number; metrics: MetricView[]; events: { id: nu
 export function MinerHistory({ id, revision, activity = false }: { id: string; revision: number; activity?: boolean }) {
   const { t, i18n } = useTranslation();
   const [hours, setHours] = useState(1), [section, setSection] = useState(activity ? 'events' : 'metrics');
-  const [field, setField] = useState<'hashRate' | 'power' | 'temp'>('hashRate');
+  const [field, setField] = useState<'hashRate' | 'power' | 'temp' | 'vrTemp'>('hashRate');
   const [offset, setOffset] = useState(0), [history, setHistory] = useState<History | null>(null), [error, setError] = useState('');
   useEffect(() => {
     const controller = new AbortController();
@@ -18,13 +18,13 @@ export function MinerHistory({ id, revision, activity = false }: { id: string; r
     return () => controller.abort();
   }, [id, hours, section, offset, revision]);
   const reset = () => { setHistory(null); setOffset(0); };
-  const label = field === 'hashRate' ? 'hashrate' : field === 'temp' ? 'temperature' : 'power';
+  const label = field === 'hashRate' ? 'hashrate' : field === 'temp' ? 'temperature' : field === 'vrTemp' ? 'vrTemp' : 'power';
   const date = (value: string) => new Date(value).toLocaleString(i18n.language);
   return <section className="miner-history" aria-label={t(activity ? 'activity' : 'history')}>
     <div className="history-controls"><h3>{t(activity ? 'activity' : 'history')}</h3>
       {activity && <label>{t('activityType')}<select value={section} onChange={e => { reset(); setSection(e.target.value); }}><option value="events">{t('deviceEvents')}</option><option value="changes">{t('configurationHistory')}</option><option value="metrics">{t('history')}</option></select></label>}
       <label>{t('timeRange')}<select value={hours} onChange={e => { reset(); setHours(Number(e.target.value)); }}><option value="1">{t('oneHour')}</option><option value="24">{t('oneDay')}</option><option value="168">{t('oneWeek')}</option></select></label>
-      {section === 'metrics' && <label>{t('chartMetric')}<select value={field} onChange={e => setField(e.target.value as typeof field)}><option value="hashRate">{t('hashrate')}</option><option value="power">{t('power')}</option><option value="temp">{t('temperature')}</option></select></label>}
+      {section === 'metrics' && <label>{t('chartMetric')}<select value={field} onChange={e => setField(e.target.value as typeof field)}><option value="hashRate">{t('hashrate')}</option><option value="power">{t('power')}</option><option value="temp">{t('temperature')}</option><option value="vrTemp">{t('vrTemp')}</option></select></label>}
     </div>
     {error ? <p role="alert">{t(`errors.${error}`, { defaultValue: t('errors.operationFailed') })}</p> : !history ? <p role="status">{t('loading')}</p> : <>
       {section === 'metrics' && <><div className="charts single-chart"><Chart bucketMinutes={history.bucketMinutes} key={field} metrics={history.metrics} field={field} unit={field === 'hashRate' ? 'GH/s' : field === 'power' ? 'W' : '°C'} label={t(label)} /></div><p className="muted">{history.bucketMinutes ? t('historyAverages', { minutes: history.bucketMinutes }) : t('historyLimit', { count: history.limit })}</p></>}

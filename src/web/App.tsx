@@ -15,6 +15,9 @@ import { MinerFacts } from './MinerFacts';
 import { TemperatureReading } from './TemperatureReading';
 import { HashrateAverages } from './HashrateAverages';
 import { PoolProfiles } from './PoolProfiles';
+import { FleetHistory } from './FleetHistory';
+import { poolGroups } from '../shared/fleet';
+import { poolProfileSchema, type PoolProfile } from '../shared/pool-profiles';
 import type { PoolAccounts } from '../shared/pool-profiles';
 
 function route() {
@@ -50,6 +53,15 @@ export function App() {
   const [selected, setSelected] = useState<string[]>([]);
   const [results, setResults] = useState<ActionResult[]>([]);
   const [revision, setRevision] = useState(0);
+  const [collapsedGroups, setCollapsedGroups] = useState<string[]>([]);
+  const [grouping, setGrouping] = useState('pool');
+  const [profiles, setProfiles] = useState<PoolProfile[]>([]);
+  useEffect(() => {
+    if (page !== 'fleet') return;
+    const controller = new AbortController();
+    void api<PoolProfile[]>('/pool-profiles', undefined, controller.signal).then(data => { if (!controller.signal.aborted) setProfiles(Array.isArray(data) ? data.filter(profile => poolProfileSchema.safeParse({ name: profile.name, settings: profile.settings }).success) : []); }).catch(() => { if (!controller.signal.aborted) setProfiles([]); });
+    return () => controller.abort();
+  }, [page]);
   const [filter, setFilter] = useState('all');
   const reload = useCallback(async (signal?: AbortSignal) => {
     const data = await api<DeviceView[]>('/devices', undefined, signal);
@@ -98,7 +110,9 @@ export function App() {
   const cancelDrag = () => { draggedMiner.current = null; setDragTarget(null); };
   const reorder = (source: string, target: string) => {
     const ids = ordered.map(d => d.id);
-    const next = moveMiner(ids, shown.map(d => d.id), source, target);
+    const members = grouping === 'pool' ? poolGroups(shown, Array.isArray(profiles) ? profiles : []).find(g => g.devices.some(d => d.id === source))?.devices ?? [] : shown;
+    if (!members.some(d => d.id === target)) { cancelDrag(); return; }
+    const next = moveMiner(ids, members.map(d => d.id), source, target);
     cancelDrag();
     if (next === ids) return;
     setMinerOrder(next);
@@ -108,6 +122,16 @@ export function App() {
 
   const showDetail = (device: DeviceView) => { location.hash = `miner/${device.id}`; };
   const batchDevice = devices.find(d => selected.includes(d.id) && d.snapshot);
+  const minerTable = (rows: DeviceView[]) => <div className="table-scroll"><table><thead><tr><th><input type="checkbox" aria-label={t('selectAll')} checked={!!rows.length && rows.every(d => selected.includes(d.id))} onChange={event => { const checked = event.target.checked; setSelected(current => checked ? [...new Set([...current, ...rows.map(d => d.id)])].slice(0, 50) : current.filter(id => !rows.some(d => d.id === id))); }} /></th>{['device', 'status', 'hashrate', 'power', 'inputVoltage', 'efficiency', 'temperature', 'hashErrorPercent', 'lastUpdate'].map(key => <th key={key}>{t(key)}</th>)}</tr></thead><tbody>{rows.map((device, index) => <tr key={device.id} data-miner-id={device.id}
+        className={[device.status !== 'online' ? 'stale-row' : '', dragTarget === device.id ? 'miner-drop-target' : ''].join(' ')}
+        onDragEnter={event => { if (draggedMiner.current) { event.preventDefault(); setDragTarget(device.id); } }}
+        onDragOver={event => { if (draggedMiner.current) { event.preventDefault(); event.dataTransfer.dropEffect = 'move'; setDragTarget(device.id); } }}
+        onDrop={event => { if (draggedMiner.current) { event.preventDefault(); finishDrag(device.id); } }}><td><div className="miner-row-controls"><MinerDragHandle id={device.id} name={device.name} disabled={rows.length < 2}
+          onStart={id => { draggedMiner.current = id; setDragTarget(id); }} onTarget={setDragTarget} onFinish={finishDrag} onCancel={cancelDrag}
+          onStep={direction => { const target = rows[index + direction]; if (target) reorder(device.id, target.id); }} /><input type="checkbox" aria-label={t('selectDevice', { name: device.name })} checked={selected.includes(device.id)} disabled={!selected.includes(device.id) && selected.length >= 50} onChange={event => setSelected(current => event.target.checked ? [...current, device.id] : current.filter(id => id !== device.id))} /></div></td>
+        <td><button className="device-link" onClick={() => showDetail(device)}>{device.name}</button><small>{device.address} {device.demo && <span className="tag">{t('simulated')}</span>}</small><small>{device.snapshot?.model ?? t('unknownModel')}</small></td>
+        <td><span className={`status status-${device.status}`}>{t(device.status)}</span></td><td className="numeric">{number(device.snapshot?.hashRate == null ? null : device.snapshot.hashRate / 1000)}<small>TH/s</small><HashrateAverages averages={averageHashrates([device.snapshot])} total={1} collapsible /></td><td className="numeric">{number(device.snapshot?.power)}<small>W</small></td><td className="numeric">{number(device.snapshot?.inputVoltage)}<small>V</small></td><td className="numeric">{number(efficiency(device.snapshot?.hashRate, device.snapshot?.power))}<small>J/TH</small></td><td className="numeric"><TemperatureReading value={device.snapshot?.temp} sensor="chip" stale={device.status !== 'online'} showUnit={false} /><small>°C</small></td><td className="numeric">{number(device.snapshot?.errorRate)}<small>%</small></td><td className="last-update">{date(device.lastSeen)}</td>
+      </tr>)}</tbody></table>{!rows.length && <p className="empty">{t('noMatchingDevices')}</p>}</div>;
   return <div className="app-shell">
     <aside className="sidebar"><a href="#fleet" className="brand"><svg aria-hidden="true" viewBox="0 0 40 44"><path d="M20 2 37 12v20L20 42 3 32V12Z" fill="currentColor"/><path d="M13 13h9c8 0 9 8 3 10 7 3 4 10-3 10h-9Zm5 5v4h4c3 0 3-4 0-4Zm0 8v3h4c3 0 3-3 0-3Z" fill="#123c50"/></svg>BitHive</a>
       <p className="sidebar-caption">{t('localFleet')}</p><nav aria-label={t('navigation')}><a className={page === 'fleet' ? 'nav-active' : ''} aria-current={page === 'fleet' ? 'page' : undefined} href="#fleet"><span aria-hidden="true">▦</span>{t('fleet')}</a><a className={page === 'pools' ? 'nav-active' : ''} aria-current={page === 'pools' ? 'page' : undefined} href="#pool-profiles"><span aria-hidden="true">⇢</span>{t('poolProfiles')}</a><a className={page === 'activity' ? 'nav-active' : ''} aria-current={page === 'activity' ? 'page' : undefined} href="#activity"><span aria-hidden="true">≋</span>{t('activity')}</a></nav>
@@ -130,19 +154,15 @@ export function App() {
     </section>
     {!!demoTotals.total && <div className="demo-banner"><strong>{t('demoMode')}</strong><span>{t('demoSummary', { count: demoTotals.total, hash: number(demoTotals.hashRate / 1000), power: number(demoTotals.power) })}</span></div>}
     <section className="panel fleet-panel"><div className="section-title"><div><h2>{t('yourMiners')} <span className="count">{devices.length}</span></h2><p className="muted">{t('tableHint')}</p><p id="miner-order-hint" className="muted miner-order-hint">{t('minerOrderHint')}</p><span className={orderMessage === 'minerOrderUnsaved' ? 'notice' : 'sr-only'} role="status">{orderMessage && t(orderMessage)}</span></div><label><span className="sr-only">{t('filterStatus')}</span><select value={filter} onChange={event => { cancelDrag(); setFilter(event.target.value); }}>{['all', 'online', 'stale', 'offline'].map(value => <option key={value} value={value}>{t(value)}</option>)}</select></label></div>
+      <div className="fleet-group-controls"><label>{t('groupMiners')}<select value={grouping} onChange={e => { cancelDrag(); setGrouping(e.target.value); }}><option value="pool">{t('byPoolProfile')}</option><option value="none">{t('allMinersList')}</option></select></label><p className="muted">{t('poolGroupingHint')}</p></div>
       {!!selected.length && <div className="batch-bar"><span>{t('selectedCount', { count: selected.length })}</span><button disabled={busy} onClick={() => void batch(selected).catch(() => {})}>{t('refreshSelected')}</button><button onClick={() => setBatchOpen(value => !value)}>{t('configureSelected')}</button><button onClick={() => setSelected([])}>{t('clearSelection')}</button></div>}
-      {loading ? <p className="empty" role="status">{t('loading')}</p> : !devices.length ? <div className="empty"><div className="hive-mark" aria-hidden="true">⬡</div><h3>{t('emptyTitle')}</h3><p>{t('emptyHint')}</p><button onClick={() => setAdding(true)} className="primary">{t('addFirst')}</button><button disabled={busy} onClick={() => void mutation(() => api('/demo', {}))}>{t('tryDemo')}</button></div> : <div className="table-scroll"><table><thead><tr><th><input type="checkbox" aria-label={t('selectAll')} checked={!!shown.length && shown.every(d => selected.includes(d.id))} onChange={event => setSelected(event.target.checked ? shown.slice(0, 50).map(d => d.id) : [])} /></th>{['device', 'status', 'hashrate', 'power', 'inputVoltage', 'efficiency', 'temperature', 'hashErrorPercent', 'lastUpdate'].map(key => <th key={key}>{t(key)}</th>)}</tr></thead><tbody>{shown.map((device, index) => <tr key={device.id} data-miner-id={device.id}
-        className={[device.status !== 'online' ? 'stale-row' : '', dragTarget === device.id ? 'miner-drop-target' : ''].join(' ')}
-        onDragEnter={event => { if (draggedMiner.current) { event.preventDefault(); setDragTarget(device.id); } }}
-        onDragOver={event => { if (draggedMiner.current) { event.preventDefault(); event.dataTransfer.dropEffect = 'move'; setDragTarget(device.id); } }}
-        onDrop={event => { if (draggedMiner.current) { event.preventDefault(); finishDrag(device.id); } }}><td><div className="miner-row-controls"><MinerDragHandle id={device.id} name={device.name} disabled={shown.length < 2}
-          onStart={id => { draggedMiner.current = id; setDragTarget(id); }} onTarget={setDragTarget} onFinish={finishDrag} onCancel={cancelDrag}
-          onStep={direction => { const target = shown[index + direction]; if (target) reorder(device.id, target.id); }} /><input type="checkbox" aria-label={t('selectDevice', { name: device.name })} checked={selected.includes(device.id)} disabled={!selected.includes(device.id) && selected.length >= 50} onChange={event => setSelected(current => event.target.checked ? [...current, device.id] : current.filter(id => id !== device.id))} /></div></td>
-        <td><button className="device-link" onClick={() => showDetail(device)}>{device.name}</button><small>{device.address} {device.demo && <span className="tag">{t('simulated')}</span>}</small><small>{device.snapshot?.model ?? t('unknownModel')}</small></td>
-        <td><span className={`status status-${device.status}`}>{t(device.status)}</span></td><td className="numeric">{number(device.snapshot?.hashRate == null ? null : device.snapshot.hashRate / 1000)}<small>TH/s</small><HashrateAverages averages={averageHashrates([device.snapshot])} total={1} collapsible /></td><td className="numeric">{number(device.snapshot?.power)}<small>W</small></td><td className="numeric">{number(device.snapshot?.inputVoltage)}<small>V</small></td><td className="numeric">{number(efficiency(device.snapshot?.hashRate, device.snapshot?.power))}<small>J/TH</small></td><td className="numeric"><TemperatureReading value={device.snapshot?.temp} sensor="chip" stale={device.status !== 'online'} showUnit={false} /><small>°C</small></td><td className="numeric">{number(device.snapshot?.errorRate)}<small>%</small></td><td className="last-update">{date(device.lastSeen)}</td>
-      </tr>)}</tbody></table>{!shown.length && <p className="empty">{t('noMatchingDevices')}</p>}</div>}
+      {loading ? <p className="empty" role="status">{t('loading')}</p> : !devices.length ? <div className="empty"><div className="hive-mark" aria-hidden="true">⬡</div><h3>{t('emptyTitle')}</h3><p>{t('emptyHint')}</p><button onClick={() => setAdding(true)} className="primary">{t('addFirst')}</button><button disabled={busy} onClick={() => void mutation(() => api('/demo', {}))}>{t('tryDemo')}</button></div> : <>{grouping === 'pool' ? poolGroups(shown, Array.isArray(profiles) ? profiles : []).map(group => {
+        const totals = aggregate(group.devices);
+        return <details className="pool-group" key={group.key} open={!collapsedGroups.includes(group.key)} onToggle={event => { const open = event.currentTarget.open; setCollapsedGroups(current => open ? current.filter(key => key !== group.key) : current.includes(group.key) ? current : [...current, group.key]); }}><summary><span className="pool-group-name"><strong>{group.names.join(' / ') || group.endpoint || t('unknownPool')}</strong><small>{group.names.length > 0 ? group.endpoint : null}{group.account && ` · ${group.account}`} {group.demo && t('simulated')} · {t(group.confirmed ? 'activePool' : 'configuredPoolUnconfirmed')}</small></span><span className="pool-group-totals"><span>{t('groupAvailability', { online: totals.online, total: totals.total })}</span><strong>{number(totals.hashRate / 1000)} TH/s</strong><strong>{number(totals.power)} W</strong></span></summary>{minerTable(group.devices)}</details>;
+      }) : minerTable(shown)}{!shown.length && <p className="empty">{t('noMatchingDevices')}</p>}</>}
       <div className="panel-footer"><span className="local-dot" />{t('refreshHint')}<span>{t('staleHint')}</span></div>
     </section>
+    <FleetHistory devices={devices} revision={revision} />
     {batchOpen && batchDevice && <section className="panel"><h2>{t('configureSelected')}</h2><p className="muted">{t('batchConfigHint')}</p><Configuration key={`batch-${selected.join(',')}`} device={batchDevice} showRestart={false} count={selected.length} busy={busy} onApply={(settings, acknowledged, accounts) => batch(selected, settings, acknowledged, accounts)} /></section>}
     </>}
     {(page === 'fleet' || page === 'miner') && !!results.length && <section className="panel results" aria-live="polite"><h2>{t('actionResults')}</h2>{results.filter(result => page !== 'miner' || result.id === detailId).map(result => <p key={result.id}><strong>{devices.find(d => d.id === result.id)?.name ?? result.id}</strong><span className={`status status-${result.result === 'verified' || result.result === 'refreshed' ? 'online' : 'stale'}`}>{t(`results.${result.result}`)}</span>{result.reason && <span>{t(`errors.${result.reason}`, { defaultValue: t('errors.operationFailed') })}</span>}</p>)}<p className="muted">{t('uncertainHint')}</p></section>}

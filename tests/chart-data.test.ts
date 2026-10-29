@@ -2,6 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { nearestSample, valueScale, hashRateScale } from '../src/web/chart-data';
 
 describe('chart scales', () => {
+  it('handles the bounded 500-miner week without exceeding argument limits', () => {
+    const values = Array.from({ length: 500 * 336 }, (_, index) => 50 + index % 20);
+    expect(valueScale(values).min).toBeLessThanOrEqual(50);
+    expect(valueScale(values).max).toBeGreaterThanOrEqual(69);
+  });
   it.each([[1400, 1500], [27.6, 27.8], [54.2, 55], [0, 0], [55, 55], [-10, -10], [0.00001, 0.00002]])('bounds readings and produces a finite labeled scale for %j', (...values) => {
     const scale = valueScale(values);
     expect(scale.min).toBeLessThanOrEqual(Math.min(...values));
